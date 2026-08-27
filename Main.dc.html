@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    a { color: #9A6E20; } a:hover { color: #16150F; }
+    button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #E8E6E0; color: #16150F; display: flex; flex-direction: column;">
+
+  <!-- Masthead: the app's own title, set as a specimen header rather than a UI label. -->
+  <div style="padding: 18px 16px 12px; border-bottom: 1px solid #16150F;">
+    <div style="font-variant: small-caps; font-weight: 600; letter-spacing: 0.14em; font-size: 14px; color: #7A776C;">Chord diagram builder</div>
+  </div>
+
+  <div style="flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; padding: 12px 16px 0; gap: 12px; min-height: 0;">
+
+    <!-- FROZEN PLATE — identical in every artboard. -->
+    <div style="width: 100%; max-width: 420px; background: #FFFFFF; border: 1px solid #16150F;">
+      <svg viewBox="0 0 320 370" width="100%" role="img" aria-label="C chord diagram" style="display: block;">
+        <rect x="0" y="0" width="320" height="370" fill="#FFFFFF"></rect>
+        <text x="160" y="52" text-anchor="middle" fill="#16150F" font-family="Georgia, 'Times New Roman', serif" font-size="30">{{name}}</text>
+        <line x1="28" y1="96" x2="248" y2="96" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="28" y1="146" x2="248" y2="146" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="28" y1="196" x2="248" y2="196" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="28" y1="246" x2="248" y2="246" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="28" y1="296" x2="248" y2="296" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="28" y1="346" x2="248" y2="346" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <rect x="28" y="91.5" width="220" height="9" fill="{{nutFill}}"></rect>
+        <line x1="248" y1="96" x2="248" y2="346" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="204" y1="96" x2="204" y2="346" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="160" y1="96" x2="160" y2="346" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="116" y1="96" x2="116" y2="346" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="72" y1="96" x2="72" y2="346" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <line x1="28" y1="96" x2="28" y2="346" stroke="#16150F" stroke-width="2.5" stroke-linecap="square"></line>
+        <text x="268" y="121" text-anchor="start" dominant-baseline="central" fill="#16150F" font-family="Georgia, 'Times New Roman', serif" font-size="20">{{fretLabel}}</text>
+        <circle cx="248" cy="79" r="8" fill="none" stroke="#16150F" stroke-width="2.5"></circle>
+        <circle cx="160" cy="79" r="8" fill="none" stroke="#16150F" stroke-width="2.5"></circle>
+        <line x1="20.5" y1="71.5" x2="35.5" y2="86.5" stroke="#16150F" stroke-width="2.5" stroke-linecap="round"></line>
+        <line x1="20.5" y1="86.5" x2="35.5" y2="71.5" stroke="#16150F" stroke-width="2.5" stroke-linecap="round"></line>
+        <circle cx="72" cy="221" r="14" fill="#16150F"></circle>
+        <circle cx="116" cy="171" r="14" fill="#16150F"></circle>
+        <circle cx="204" cy="121" r="14" fill="#16150F"></circle>
+      </svg>
+    </div>
+    <!-- /FROZEN PLATE -->
+
+    <!-- The name leaves the export modal and becomes the plate's caption. -->
+    <button type="button" onClick="{{ openSheet }}" style="min-height: 44px; padding: 0 8px; border: 0; background: transparent; font-family: system-ui, -apple-system, sans-serif; font-style: italic; font-size: 16px; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 5px; text-decoration-color: #7A776C; color: {{captionColor}}">{{caption}}</button>
+  </div>
+
+  <div style="padding: 0 16px 26px; display: flex; flex-direction: column;">
+
+    <!-- A setting reads as a ruled specimen row; a mode reads as a bordered
+         control. Air between them so the two never scan as one group. -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 0 10px; border-top: 1px solid #16150F; border-bottom: 1px solid #16150F;">
+      <span style="font-variant: small-caps; font-weight: 600; letter-spacing: 0.12em; font-size: 14px; color: #7A776C;">Position</span>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <button type="button" onClick="{{ dec }}" disabled="{{ atMin }}" aria-label="Move down one fret" style="width: 44px; height: 44px; border: 0; background: transparent; font-family: system-ui, -apple-system, sans-serif; font-size: 20px; cursor: pointer; color: {{decColor}}">&minus;</button>
+        <span style="min-width: 56px; text-align: center; font-size: 17px; font-variant-numeric: tabular-nums;">{{fretLabel}}</span>
+        <button type="button" onClick="{{ inc }}" disabled="{{ atMax }}" aria-label="Move up one fret" style="width: 44px; height: 44px; border: 0; background: transparent; font-family: system-ui, -apple-system, sans-serif; font-size: 20px; cursor: pointer; color: {{incColor}}">+</button>
+      </div>
+    </div>
+
+    <button type="button" onClick="{{ toggleBarre }}" aria-pressed="{{ barre }}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; margin-top: 20px; padding: 0 14px; width: 100%; border: 1px solid #16150F; cursor: pointer; text-align: left; background: {{barreRowBg}}">
+      <span style="font-variant: small-caps; font-weight: 600; letter-spacing: 0.12em; font-size: 14px; color: {{barreLabelColor}}">Barre</span>
+      <span style="font-family: system-ui, -apple-system, sans-serif; font-style: italic; font-size: 16px; color: {{barreColor}}">{{barreWord}}</span>
+    </button>
+
+    <p style="margin: 6px 0 0; min-height: 1.4em; font-style: italic; font-size: 14px; color: {{hintColor}}">{{hintText}}</p>
+
+    <button type="button" style="margin-top: 12px; min-height: 52px; border: 1px solid #16150F; background: #16150F; color: #E8E6E0; font-family: system-ui, -apple-system, sans-serif; font-variant: small-caps; font-weight: 600; letter-spacing: 0.14em; font-size: 15px; cursor: pointer;">Make my chord</button>
+
+    <button type="button" onClick="{{ clearAll }}" style="margin-top: 0; min-height: 44px; border: 0; background: transparent; font-family: system-ui, -apple-system, sans-serif; font-variant: small-caps; font-weight: 600; letter-spacing: 0.12em; font-size: 14px; color: #7A776C; cursor: pointer;">Clear</button>
+  </div>
+
+  <!-- Naming sheet -->
+  <sc-if value="{{ sheet }}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(22, 21, 15, 0.4); display: flex; align-items: flex-end; justify-content: center;">
+      <div style="width: 100%; background: #E8E6E0; border-top: 1px solid #16150F; padding: 18px 16px 26px; display: flex; flex-direction: column; gap: 12px;">
+        <span style="font-variant: small-caps; font-weight: 600; letter-spacing: 0.12em; font-size: 14px; color: #7A776C;">Chord name</span>
+        <input value="{{ draft }}" onChange="{{ onDraft }}" placeholder="D Maj13" style="min-height: 46px; padding: 0 12px; border: 1px solid #16150F; border-radius: 0; background: #FFFFFF; color: #16150F; font-family: system-ui, -apple-system, sans-serif; font-size: 17px;">
+        <div style="display: flex; gap: 8px;">
+          <button type="button" onClick="{{ closeSheet }}" style="flex: 1 1 auto; min-height: 46px; border: 1px solid #16150F; background: transparent; color: #16150F; font-family: system-ui, -apple-system, sans-serif; font-size: 16px; cursor: pointer;">Cancel</button>
+          <button type="button" onClick="{{ saveSheet }}" style="flex: 1 1 auto; min-height: 46px; border: 1px solid #16150F; background: #16150F; color: #E8E6E0; font-family: system-ui, -apple-system, sans-serif; font-size: 16px; cursor: pointer;">Save PNG</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { fret: 1, name: 'C', barre: false, sheet: false, draft: 'C' };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const named = s.name.trim();
+    const atMin = s.fret <= 1;
+    const atMax = s.fret >= 17;
+    return {
+      name: s.name,
+      fretLabel: s.fret + 'fr',
+      nutFill: s.fret === 1 ? '#16150F' : 'none',
+      caption: named ? named : 'untitled',
+      captionColor: named ? '#16150F' : '#7A776C',
+      barre: s.barre,
+      barreWord: s.barre ? 'on' : 'off',
+      barreColor: s.barre ? '#E8E6E0' : '#7A776C',
+      barreRowBg: s.barre ? '#16150F' : 'transparent',
+      barreLabelColor: s.barre ? '#E8E6E0' : '#7A776C',
+      hintColor: s.barre ? '#16150F' : '#7A776C',
+      hintText: s.barre ? 'Tap the two ends of the barre.' : '',
+      atMin: atMin,
+      atMax: atMax,
+      decColor: atMin ? '#7A776C' : '#16150F',
+      incColor: atMax ? '#7A776C' : '#16150F',
+      sheet: s.sheet,
+      draft: s.draft,
+      dec: () => this.setState({ fret: Math.max(1, s.fret - 1) }),
+      inc: () => this.setState({ fret: Math.min(17, s.fret + 1) }),
+      toggleBarre: () => this.setState({ barre: !s.barre }),
+      clearAll: () => this.setState({ name: '', barre: false }),
+      openSheet: () => this.setState({ sheet: true, draft: s.name }),
+      closeSheet: () => this.setState({ sheet: false }),
+      saveSheet: () => this.setState({ name: s.draft, sheet: false }),
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+    };
+  }
+}
+</script>
+</body>
+</html>

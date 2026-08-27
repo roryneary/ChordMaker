@@ -1,0 +1,50 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Design A" },
+    { "id": "page-2", "name": "Not chosen" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Plate + Caption — Phone", "page": "page-1", "x": 0, "y": 0, "w": 390, "h": 844, "is_interactive": true },
+    { "file": "PlateCaptionDesktop.dc.html", "title": "Plate + Caption — Desktop", "page": "page-1", "x": 510, "y": 0, "w": 1440, "h": 900, "is_interactive": true },
+
+    { "file": "BenchPhone.dc.html", "title": "B · Bench — Phone", "page": "page-2", "x": 0, "y": 0, "w": 390, "h": 844, "is_interactive": true },
+    { "file": "BenchDesktop.dc.html", "title": "B · Bench — Desktop", "page": "page-2", "x": 510, "y": 0, "w": 1440, "h": 900, "is_interactive": true },
+    { "file": "FretRailPhone.dc.html", "title": "C · Fret Rail — Phone", "page": "page-2", "x": 0, "y": 1100, "w": 390, "h": 844, "is_interactive": true },
+    { "file": "FretRailDesktop.dc.html", "title": "C · Fret Rail — Desktop", "page": "page-2", "x": 510, "y": 1100, "w": 1440, "h": 900, "is_interactive": true }
+  ],
+  "annotations": [
+    {
+      "id": "note-a",
+      "page": "page-1",
+      "x": 0,
+      "y": -300,
+      "w": 440,
+      "text": "PLATE + CAPTION\nThe chrome recedes into typography, on the app's existing system-ui stack — no new font ships. Controls are ruled specimen rows rather than boxed buttons, and the chord name leaves the export modal to sit under the plate as its caption.\n\nWatch for: ruled rows are lower-affordance than buttons, so barre mode leans harder on the hint line to explain itself."
+    },
+    {
+      "id": "note-plate",
+      "page": "page-1",
+      "x": 2070,
+      "y": 0,
+      "w": 400,
+      "text": "The guitar area is frozen.\nThe 320×370 plate is byte-identical to what renderChordSVG already draws — same lines, same dots, same 1px ink border. Only three things move, and all three already move in the shipped app: the position label, the nut bar, and the chord name.\n\nTapping the fretboard to place dots is deliberately inert here."
+    },
+    {
+      "id": "note-b",
+      "page": "page-2",
+      "x": 2070,
+      "y": 0,
+      "w": 420,
+      "text": "B — BENCH (not chosen)\nA light table: the chrome goes dark so the plate is the only lit thing on screen. Big mono fret readout, chunky segmented stepper, and a real toggle for barre whose on-state is the brass accent.\n\nKept for reference — the brass toggle and the mono readout are separable ideas if you ever want them."
+    },
+    {
+      "id": "note-c",
+      "page": "page-2",
+      "x": 2070,
+      "y": 1100,
+      "w": 420,
+      "text": "C — FRET RAIL (not chosen)\nTap the fret you want on a 1–17 rail instead of stepping to it, and edit the name inline so the export modal disappears.\n\nKept for reference — the rail is separable from the rest of the direction if the stepper ever proves slow."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}
