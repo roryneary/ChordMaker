@@ -1,0 +1,501 @@
+/* Song, full-screen, ready and capo styles. Splits from app.css purely for
+   file size; both read only from styles/tokens.css. */
+
+/* --- Capo ---------------------------------------------------------------- */
+
+.capo-wrap { position: relative; align-self: flex-start; }
+
+.capo {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.capo-chip {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  cursor: pointer;
+}
+
+button.capo-chip:hover { box-shadow: var(--shadow-md); }
+
+.capo-statement {
+  background: var(--tint-bg);
+  color: var(--tint-text);
+  font-size: 13.5px;
+  padding: 7px 13px;
+}
+
+/* Reads as a capo laid across the neck. */
+.capo-bar {
+  width: 17px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  flex: none;
+}
+
+.capo-statement .capo-bar { width: 18px; background: currentColor; }
+
+.capo-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 150px;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.capo-menu button {
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.capo-menu button:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.capo-menu button.is-on { background: var(--tint-bg); color: var(--tint-text); }
+
+/* --- Song screen (M04 / D1) ---------------------------------------------- */
+
+.song { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.song-head-m {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px 0;
+}
+
+.song-titles { display: flex; flex-direction: column; line-height: 1.25; }
+.song-titles strong { font-family: var(--font-heading); font-size: 18px; font-weight: 500; }
+.song-titles em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--color-text) 48%, transparent);
+}
+
+.song-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px 8px;
+}
+
+.kicker {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.display-md { font-size: 30px; letter-spacing: -0.02em; }
+.display-lg { font-size: 28px; letter-spacing: -0.02em; margin-top: 10px; }
+
+.label-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.label-row h2 { font-size: 17px; font-weight: 500; }
+.label-row > span {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 48%, transparent);
+}
+.label-row .spacer { flex: 1; }
+
+.icon-btn.sm {
+  width: 32px;
+  height: 32px;
+  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md);
+}
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.chord-tiles {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.chord-tiles > li { width: 74px; }
+
+.chord-tile {
+  width: 100%;
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.chord-tile:hover { box-shadow: var(--shadow-md); }
+.chord-tile strong { font-family: var(--font-heading); font-weight: 500; }
+.chord-tile .diagram { width: 100%; }
+
+.chord-add {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px dashed color-mix(in srgb, var(--color-text) 24%, transparent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.chord-add:hover { background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
+
+.chord-tiles-d { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.chord-tiles-d > li { width: auto; }
+.chord-tiles-d .chord-tile { padding: 16px 12px; gap: 8px; }
+.chord-tiles-d .chord-tile .diagram { max-width: 104px; }
+
+.words-block {
+  margin-top: 12px;
+  padding: 13px 15px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.words-block-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+
+.words-block-foot > span { display: inline-flex; align-items: center; gap: 6px; }
+
+.words-empty {
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nudge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 13px 16px;
+  border-radius: var(--radius-md);
+  background: var(--tint-bg);
+  color: var(--tint-text);
+}
+
+.nudge svg { flex: none; color: var(--tint-strong); }
+.nudge p { flex: 1; margin: 0; font-size: 13.5px; }
+.nudge .btn-ghost { color: var(--tint-text); }
+
+/* Desktop: header pinned, body scrolls. Never clip without a scrollbar. */
+.song-desktop { height: 100%; overflow: hidden; }
+
+.song-head { flex: none; padding: 26px 40px 0; }
+.song-head-row { display: flex; align-items: flex-start; gap: 16px; }
+.song-head-row .display-md { flex: 1; }
+.song-actions-d { display: flex; gap: 8px; }
+
+.song-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 9px;
+  font-size: 13.5px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.rule-flush { margin: 20px 0 0; }
+.song-desktop .song-body { padding: 20px 40px 28px; }
+.label-row-words { margin: 22px 0 4px; }
+
+/* --- Sheets -------------------------------------------------------------- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  border: 0;
+  padding: 0;
+  background: var(--scrim);
+  cursor: pointer;
+}
+
+.sheet {
+  position: fixed;
+  z-index: 31;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px 24px 26px;
+  padding-bottom: calc(26px + env(safe-area-inset-bottom));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.sheet h2 { font-size: 20px; font-weight: 500; margin-bottom: 14px; }
+
+.grab {
+  display: block;
+  width: 36px;
+  height: 3px;
+  margin: 0 auto 18px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-text) 24%, transparent);
+}
+
+.sheet-remove { margin-top: 14px; }
+
+.share-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 15px 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.share-row:disabled { opacity: 0.45; cursor: not-allowed; }
+.share-row svg { flex: none; color: var(--color-accent); margin-top: 2px; }
+.share-row span { display: flex; flex-direction: column; gap: 2px; }
+.share-row strong { font-size: 15px; font-weight: 400; }
+.share-row em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--color-text) 48%, transparent);
+}
+
+@media (min-width: 700px) {
+  .sheet { left: 50%; right: auto; transform: translateX(-50%); width: 460px; }
+}
+
+/* --- Ready (M06) --------------------------------------------------------- */
+
+.ready { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ready-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 24px 24px; }
+.ready-meta {
+  margin: 6px 0 14px;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+}
+
+.ready-chords {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.ready-chords > li { display: flex; align-items: center; gap: 14px; }
+.ready-chords strong {
+  min-width: 52px;
+  font-family: var(--font-heading);
+  font-size: 34px;
+  font-weight: 500;
+}
+
+/* --- Full screen (M05 / D3) ---------------------------------------------- */
+
+.fs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.fs-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 20px 14px;
+}
+
+.fs-title {
+  flex: 1;
+  font-size: 13.5px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.seg { display: flex; border-radius: var(--radius-md); overflow: hidden; }
+
+.seg button {
+  padding: 5px 11px;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-text) 62%, transparent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.seg button + button { border-left: 1px solid var(--color-divider); font-size: 14px; }
+.seg button.is-on { color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+
+.fs-words {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 24px 0;
+}
+
+.fs-col { display: flex; flex-direction: column; gap: 20px; }
+
+.fs-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 72px;
+  padding: 14px 60px 0;
+  align-content: start;
+}
+
+.fs-two-col .fs-col { gap: 24px; }
+
+.fs-bottom {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-divider);
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.fs-bottom .capo-statement { background: transparent; color: inherit; padding: 0; }
+.fs-bottom .spacer { flex: 1; }
+
+.fs-awake {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+
+@media (min-width: 1024px) {
+  .fs-top { height: 60px; padding: 0 30px; }
+  .fs-bottom { padding: 16px 30px; font-size: 13px; }
+  .ready-body { padding: 40px; }
+  .display-lg { font-size: 36px; }
+  .ready-chords { max-width: 620px; }
+}
+
+/* The song's name is edited in place — there is no separate naming step.
+   Deliberately sets no font-size: the size always comes from a heading class
+   alongside it (.display-sm, .display-md), so a name and the heading it sits
+   with cannot drift apart. */
+.title-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-weight: 500;
+  /* Same vertical rhythm as the heading rule, so the name and the heading
+     it sits beside line up. */
+  line-height: 1.12;
+}
+
+.title-input::placeholder { color: color-mix(in srgb, var(--color-text) 32%, transparent); }
+
+/* Edited in place, so it needs to look editable before you click it. */
+.title-input {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent);
+}
+.title-input:hover {
+  border-bottom-color: color-mix(in srgb, var(--color-text) 40%, transparent);
+}
+.title-input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--color-accent);
+}
+.song-titles { flex: 1; min-width: 0; }
+
+/* The song screen's own header is smaller than a screen heading. */
+.song-head-m .title-input { font-size: 18px; }
+
+/* The song's name is the first thing you set on the words screen, so it reads
+   as the screen's other heading — same type as "Paste the words." */
+.name-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 22px; }
+.name-field .micro-label { margin: 0; }
+.name-field .title-input { padding-bottom: 4px; }
+
+/* The phone puts both asks as ordinary section headings — the same 17px
+   label-row every other section of the app uses. Display type read as a clear
+   instruction but cost so much height that the words box fell off the bottom
+   of the screen, and a field you cannot see is worse than a quiet heading. */
+.label-row-lead { margin-top: 4px; }
+.label-row h2 label { cursor: pointer; }
+.name-input { margin-top: 10px; }
+
+.words-bar-title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+}
+
+
+
+/* Says why the primary action is unavailable, rather than leaving it a mystery. */
+.action-hint {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  text-align: center;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}

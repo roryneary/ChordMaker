@@ -1,0 +1,116 @@
+/**
+ * Nocturne tokens. Mirrors src/theme/tokens.ts — keep the two in step.
+ *
+ * Three states, not two: an explicit choice stamps data-theme on <html>, and
+ * with nothing stamped the OS preference decides. Only token VALUES are
+ * redefined per theme; no component rule may live inside a theme block, or it
+ * would never apply in the unstamped state.
+ */
+
+:root {
+  /* Ramps — one shared perceptual lightness scale, so the same numbered step
+     of any two ramps carries identical visual weight. */
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
+
+  --color-accent-100: #f5f4ff;
+  --color-accent-200: #e7e5fe;
+  --color-accent-300: #d2cefd;
+  --color-accent-400: #b5abfc;
+  --color-accent-500: #968ae0;
+  --color-accent-600: #796cbf;
+  --color-accent-700: #5d5294;
+  --color-accent-800: #423a6a;
+  --color-accent-900: #2b2741;
+
+  /* Light — this design's default. */
+  --color-bg: var(--color-neutral-100);
+  --color-surface: color-mix(in srgb, #f3f5fe 72%, #ffffff);
+  --color-text: var(--color-neutral-900);
+  /* accent-600: the base accent fails contrast on a pale ground. */
+  --color-accent: var(--color-accent-600);
+  --color-divider: color-mix(in srgb, #292b31 15%, transparent);
+
+  /* accent-400, NOT accent-200 — see tokens.ts. */
+  --tint-bg: var(--color-accent-400);
+  --tint-text: var(--color-accent-700);
+  --tint-strong: var(--color-accent-700);
+
+  /* On light, cards separate from the ground by hairline plus soft ink shadow,
+     not by fill difference — the surface is only a shade off the ground. */
+  --shadow-sm: 0 0 0 1px #cfd3e5;
+  --shadow-md: 0 0 0 1px #cfd3e5, 0 6px 18px rgba(41, 43, 49, 0.09);
+  --shadow-lg: 0 0 0 1px #b2b6ca, 0 16px 40px rgba(41, 43, 49, 0.16);
+
+  --scrim: color-mix(in srgb, var(--color-neutral-900) 34%, transparent);
+
+  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading-weight: 500;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  color-scheme: light;
+}
+
+/* An explicit light choice must beat a dark OS, hence the :not() guard. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: #161826;
+    --color-surface: #232532;
+    --color-text: #e9e9ed;
+    --color-accent: #9184d9;
+    --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+    --tint-bg: var(--color-accent-900);
+    --tint-text: var(--color-accent-200);
+    --tint-strong: var(--color-accent-300);
+
+    /* On a dark ground elevation is an edge plus ambient darkness. */
+    --shadow-sm: 0 0 0 1px #3f424d;
+    --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+    /* A dark ground needs a heavier scrim than a light one to read as dimmed. */
+    --scrim: color-mix(in srgb, var(--color-neutral-900) 62%, transparent);
+
+    color-scheme: dark;
+  }
+}
+
+/* …and the toggle must win in the other direction too. */
+:root[data-theme='dark'] {
+  --color-bg: #161826;
+  --color-surface: #232532;
+  --color-text: #e9e9ed;
+  --color-accent: #9184d9;
+  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+  --tint-bg: var(--color-accent-900);
+  --tint-text: var(--color-accent-200);
+  --tint-strong: var(--color-accent-300);
+
+  --shadow-sm: 0 0 0 1px #3f424d;
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+  --scrim: color-mix(in srgb, var(--color-neutral-900) 62%, transparent);
+
+  color-scheme: dark;
+}

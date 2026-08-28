@@ -1,8 +1,18 @@
 import type { ChordSpec } from '../types/chord';
-import { VB_H, VB_W } from './layout';
+import { VB_H, viewBoxWidth } from './layout';
+import { EXPORT_INK, EXPORT_PAPER } from '../theme/tokens';
 import { renderChordSVG } from './renderChordSVG';
 
 export const DEFAULT_SCALE = 3;
+
+/**
+ * Downloads and prints are black ink on white paper whatever the screen theme
+ * is — a chord dictionary page, not a screenshot of the app.
+ */
+export const exportPalette = { ink: EXPORT_INK, paper: EXPORT_PAPER } as const;
+
+/** The drawn size of a chord, which now depends on whether it carries a label. */
+export const chordBox = (spec: ChordSpec) => ({ w: viewBoxWidth(spec.rootFret), h: VB_H });
 
 /**
  * Decodes a chord into a drawable image at `scale` pixels per SVG unit. The
@@ -12,7 +22,7 @@ export const DEFAULT_SCALE = 3;
  * single-chord PNG export below and the whole-song PNG.
  */
 export async function chordToImage(spec: ChordSpec, scale = DEFAULT_SCALE): Promise<HTMLImageElement> {
-  const svg = renderChordSVG(spec, { mode: 'export', scale });
+  const svg = renderChordSVG(spec, { mode: 'export', scale, ...exportPalette });
   // An explicit charset on the Blob handles names like "C#" without the
   // unescape(encodeURIComponent(...)) data-URI dance.
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
@@ -30,9 +40,10 @@ export async function chordToImage(spec: ChordSpec, scale = DEFAULT_SCALE): Prom
 
 export async function chordToPngBlob(spec: ChordSpec, scale = DEFAULT_SCALE): Promise<Blob> {
   const img = await chordToImage(spec, scale);
+  const box = chordBox(spec);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(VB_W * scale);
-  canvas.height = Math.round(VB_H * scale);
+  canvas.width = Math.round(box.w * scale);
+  canvas.height = Math.round(box.h * scale);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context unavailable');
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);

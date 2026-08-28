@@ -1,228 +1,232 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import ChordPlate from './components/ChordPlate';
-import ChordStrip from './components/ChordStrip';
-import NameSheet from './components/NameSheet';
-import SongBar from './components/SongBar';
-import SongStart from './components/SongStart';
-import Toolbar from './components/Toolbar';
-import { isEmptySpec, useChordSpec } from './hooks/useChordSpec';
-import { useSong } from './hooks/useSong';
+import { useCallback, useEffect, useState } from 'react';
+import AppShell, { libraryIsStep } from './components/shell/AppShell';
+import ChordEditor from './screens/ChordEditor';
+import FullScreen from './screens/FullScreen';
+import Landing from './screens/Landing';
+import Library from './screens/Library';
+import Ready from './screens/Ready';
+import SongScreen from './screens/SongScreen';
+import WordsEditor from './screens/WordsEditor';
+import { type Route, useRoute } from './app/routes';
+import { useSongs } from './hooks/useSongs';
+import { findLibraryChord, libraryChordToSpec } from './data/chordLibrary';
+import { newId } from './lib/id';
+import { downloadBlob } from './lib/exportPng';
 import { songFilename, songToPdfBlob } from './lib/exportPdf';
-import { chordFilename, chordToPngBlob, downloadBlob } from './lib/exportPng';
-import { songPngFilename, songToPngBlob } from './lib/exportSongPng';
-import type { SavedChord } from './types/song';
+import { loadUserChords, saveUserChords } from './lib/storage';
+import { ThemeProvider } from './theme/ThemeProvider';
+import type { ChordSpec } from './types/chord';
+import type { Song } from './types/song';
 
-export default function App() {
-  const {
-    spec,
-    dispatch,
-    barreMode,
-    pendingBarre,
-    toggleBarreMode,
-    exitBarreMode,
-    tapCell,
-    tapMarker,
-  } = useChordSpec();
-  const { song, dispatchSong } = useSong();
+function Router() {
+  const { route, stack, go, replace, back, reset, canGoBack } = useRoute();
+  const { store, songs, current, dispatch } = useSongs();
+  const [printing, setPrinting] = useState(false);
+  /* A shape taken from the library, waiting for the editor we came from to
+     pick it up. Cleared as soon as the editor is finished with. */
+  const [picked, setPicked] = useState<ChordSpec | null>(null);
 
-  // A song that was restored from storage skips the start screen.
-  const [started, setStarted] = useState(
-    () => song.title.trim() !== '' || song.chords.length > 0,
+  // The route names the song; the store's currentId has to follow it, or the
+  // sidebar would highlight one song while the pane shows another.
+  const routedSongId = 'songId' in route ? route.songId : null;
+  useEffect(() => {
+    if (routedSongId && routedSongId !== store.currentId) {
+      dispatch({ type: 'OPEN_SONG', id: routedSongId });
+    }
+  }, [routedSongId, store.currentId, dispatch]);
+
+  const songFor = (id: string | null): Song | null => songs.find((s) => s.id === id) ?? null;
+
+  /** Chord names live on the chord, so a placement only carries its id. */
+  const namerFor = useCallback(
+    (song: Song) => (chordId: string) =>
+      song.chords.find((c) => c.id === chordId)?.spec.name.trim() || null,
+    [],
   );
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [exportKind, setExportKind] = useState<'pdf' | 'png' | null>(null);
-  const busy = exportKind !== null;
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<number | undefined>(undefined);
 
-  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
+  /** "Just one chord" belongs to no song — it goes to the user's own shapes. */
+  const saveLooseChord = useCallback((spec: ChordSpec) => {
+    saveUserChords([...loadUserChords(), { id: newId(), spec }]);
   }, []);
 
-  const resetEditor = useCallback(() => {
-    dispatch({ type: 'CLEAR' });
-    exitBarreMode();
-    setEditingId(null);
-  }, [dispatch, exitBarreMode]);
+  const startSong = useCallback(() => {
+    // The id is minted here rather than in the reducer so we can navigate to
+    // the song we just created.
+    const id = newId();
+    dispatch({ type: 'CREATE_SONG', title: '', id });
+    go({ name: 'words', songId: id });
+  }, [dispatch, go]);
 
-  const handleCreateSong = useCallback(
-    (title: string) => {
-      dispatchSong({ type: 'CLEAR_SONG' });
-      dispatchSong({ type: 'SET_TITLE', title });
-      resetEditor();
-      setStarted(true);
-    },
-    [dispatchSong, resetEditor],
-  );
-
-  const handleNewSong = useCallback(() => {
-    if (
-      song.chords.length > 0 &&
-      !window.confirm(`Start a new song? "${song.title.trim() || 'This song'}" and its chords will be cleared.`)
-    ) {
-      return;
-    }
-    dispatchSong({ type: 'CLEAR_SONG' });
-    resetEditor();
-    setStarted(false);
-  }, [song, dispatchSong, resetEditor]);
-
-  const handleSave = useCallback(
-    (name: string) => {
-      const named = { ...spec, name };
-      const label = name.trim() || 'chord';
-      if (editingId) {
-        dispatchSong({ type: 'UPDATE_CHORD', id: editingId, spec: named });
-        showToast(`Updated ${label}`);
-      } else {
-        dispatchSong({ type: 'ADD_CHORD', spec: named });
-        showToast(`Added ${label}`);
-      }
-      setSheetOpen(false);
-      resetEditor();
-    },
-    [spec, editingId, dispatchSong, showToast, resetEditor],
-  );
-
-  const handleEdit = useCallback(
-    (chord: SavedChord) => {
-      dispatch({ type: 'LOAD', spec: chord.spec });
-      exitBarreMode();
-      setEditingId(chord.id);
-    },
-    [dispatch, exitBarreMode],
-  );
-
-  const handleDownloadPng = useCallback(
-    async (chord: SavedChord) => {
+  const print = useCallback(
+    async (song: Song) => {
+      setPrinting(true);
       try {
-        const blob = await chordToPngBlob(chord.spec);
-        const filename = chordFilename(chord.spec.name);
-        downloadBlob(blob, filename);
-        showToast(`Saved ${filename}`);
+        const blob = await songToPdfBlob(song, namerFor(song));
+        downloadBlob(blob, songFilename(song.title));
       } catch (err) {
         console.error(err);
-        showToast('Could not save the PNG.');
+      } finally {
+        setPrinting(false);
       }
     },
-    [showToast],
+    [namerFor],
   );
 
-  const handleRemove = useCallback(
-    (chord: SavedChord) => {
-      dispatchSong({ type: 'REMOVE_CHORD', id: chord.id });
-      if (chord.id === editingId) resetEditor();
-    },
-    [dispatchSong, editingId, resetEditor],
+  const landing = (
+    <Landing
+      songs={songs}
+      onNewSong={startSong}
+      onOneChord={() => go({ name: 'chordEditor', songId: null, chordId: null })}
+      onResume={(songId) => go({ name: 'song', songId })}
+    />
   );
 
-  const handleDownloadPdf = useCallback(async () => {
-    setExportKind('pdf');
-    try {
-      const blob = await songToPdfBlob(song);
-      const filename = songFilename(song.title);
-      downloadBlob(blob, filename);
-      showToast(`Saved ${filename}`);
-    } catch (err) {
-      console.error(err);
-      showToast('Could not build the PDF.');
-    } finally {
-      setExportKind(null);
+  const screen = () => {
+    switch (route.name) {
+      case 'landing':
+        return landing;
+
+      case 'library': {
+        // Only offer selection when there is an editor underneath to return to.
+        const from = stack[stack.length - 2];
+        const forEditor = from?.name === 'chordEditor';
+        return (
+          <Library
+            /* Back belongs to the library-as-step. Reached from the Chords tab
+               it is a destination, the tab bar is the way out, and a Back
+               button there only ever lands you on the home page. */
+            onBack={libraryIsStep(from) && canGoBack ? back : undefined}
+            onPick={
+              forEditor
+                ? (name) => {
+                    const chord = findLibraryChord(name);
+                    if (chord) setPicked(libraryChordToSpec(chord));
+                    back();
+                  }
+                : undefined
+            }
+          />
+        );
+      }
+
+      case 'chordEditor': {
+        const song = songFor(route.songId);
+        const editing = song?.chords.find((c) => c.id === route.chordId) ?? null;
+        return (
+          <ChordEditor
+            songTitle={song?.title.trim() || null}
+            initial={picked ?? editing?.spec ?? null}
+            onBrowseAll={() => go({ name: 'library' })}
+            onCancel={() => {
+              setPicked(null);
+              if (song) replace({ name: 'song', songId: song.id });
+              else reset();
+            }}
+            onSave={(spec) => {
+              setPicked(null);
+              if (!song) {
+                saveLooseChord(spec);
+                reset();
+                return;
+              }
+              if (editing) {
+                dispatch({ type: 'UPDATE_CHORD', id: song.id, chordId: editing.id, spec });
+              } else {
+                dispatch({ type: 'ADD_CHORD', id: song.id, spec });
+              }
+              replace({ name: 'song', songId: song.id });
+            }}
+          />
+        );
+      }
+
+      case 'words': {
+        const song = songFor(route.songId) ?? current;
+        if (!song) return landing;
+        return (
+          <WordsEditor
+            song={song}
+            nameOf={namerFor(song)}
+            onChange={(lyric) => dispatch({ type: 'SET_LYRIC', id: song.id, lyric })}
+            onTitle={(title) => dispatch({ type: 'SET_TITLE', id: song.id, title })}
+            /* Finishing the words is a step forward when the song is new, so
+               the editor stays underneath and its Back arrow can reach it. Come
+               here from the song itself and it is a return trip instead. */
+            onDone={() => {
+              const under = stack[stack.length - 2];
+              if (under?.name === 'song' && under.songId === song.id) back();
+              else go({ name: 'song', songId: song.id });
+            }}
+            onBack={back}
+          />
+        );
+      }
+
+      case 'fullScreen': {
+        const song = songFor(route.songId) ?? current;
+        if (!song) return landing;
+        // Exit returns to the previous screen, not to the landing page.
+        return <FullScreen song={song} nameOf={namerFor(song)} onExit={back} />;
+      }
+
+      case 'ready': {
+        const song = songFor(route.songId) ?? current;
+        if (!song) return landing;
+        return (
+          <Ready
+            song={song}
+            nameOf={namerFor(song)}
+            printing={printing}
+            onPrint={() => print(song)}
+            onClose={back}
+          />
+        );
+      }
+
+      case 'song': {
+        const song = songFor(route.songId) ?? current;
+        if (!song) return landing;
+        return (
+          <SongScreen
+            song={song}
+            nameOf={namerFor(song)}
+            onBack={back}
+            onAddChord={() => go({ name: 'chordEditor', songId: song.id, chordId: null })}
+            onEditChord={(chordId) => go({ name: 'chordEditor', songId: song.id, chordId })}
+            onEditWords={() => go({ name: 'words', songId: song.id })}
+            onFullScreen={() => go({ name: 'fullScreen', songId: song.id })}
+            onReady={() => go({ name: 'ready', songId: song.id })}
+            onCapo={(capo) => dispatch({ type: 'SET_CAPO', id: song.id, capo })}
+            onTitle={(title) => dispatch({ type: 'SET_TITLE', id: song.id, title })}
+            onPlace={(wordId, chordId) =>
+              dispatch({ type: 'PLACE_CHORD', id: song.id, wordId, chordId })
+            }
+          />
+        );
+      }
     }
-  }, [song, showToast]);
+  };
 
-  const handleDownloadSongPng = useCallback(async () => {
-    setExportKind('png');
-    try {
-      const blob = await songToPngBlob(song);
-      const filename = songPngFilename(song.title);
-      downloadBlob(blob, filename);
-      showToast(`Saved ${filename}`);
-    } catch (err) {
-      console.error(err);
-      showToast('Could not build the image.');
-    } finally {
-      setExportKind(null);
-    }
-  }, [song, showToast]);
-
-  if (!started) {
-    return (
-      <div className="app">
-        <header className="app-header">
-          <h1>Chord diagram builder</h1>
-        </header>
-        <main className="app-main app-main-start">
-          <SongStart onCreate={handleCreateSong} />
-        </main>
-      </div>
-    );
-  }
-
-  const canExport = !isEmptySpec(spec);
+  const onGo = useCallback((next: Route) => go(next), [go]);
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <SongBar
-          title={song.title}
-          chordCount={song.chords.length}
-          exportingPdf={exportKind === 'pdf'}
-          exportingPng={exportKind === 'png'}
-          onTitle={(title) => dispatchSong({ type: 'SET_TITLE', title })}
-          onDownloadPdf={handleDownloadPdf}
-          onDownloadPng={handleDownloadSongPng}
-          onNewSong={handleNewSong}
-        />
-        <ChordStrip
-          chords={song.chords}
-          editingId={editingId}
-          onEdit={handleEdit}
-          onDownload={handleDownloadPng}
-          onRemove={handleRemove}
-        />
-      </header>
+    <AppShell
+      route={route}
+      previous={stack[stack.length - 2]}
+      songs={songs}
+      currentId={store.currentId}
+      onGo={onGo}
+      onStart={startSong}
+    >
+      {screen()}
+    </AppShell>
+  );
+}
 
-      <main className="app-main">
-        <ChordPlate
-          spec={spec}
-          pendingBarre={pendingBarre}
-          barreMode={barreMode}
-          onTapCell={tapCell}
-          onTapMarker={tapMarker}
-        />
-      </main>
-
-      <div className="footer">
-        <div className={`toast${toast ? ' is-visible' : ''}`} role="status" aria-live="polite">
-          {toast}
-        </div>
-        <Toolbar
-          rootFret={spec.rootFret}
-          barreMode={barreMode}
-          canExport={canExport}
-          exportLabel={editingId ? 'Update chord' : 'Add chord'}
-          onRootFret={(n) => dispatch({ type: 'SET_ROOT_FRET', rootFret: n })}
-          onToggleBarre={toggleBarreMode}
-          onClear={resetEditor}
-          onExport={() => setSheetOpen(true)}
-        />
-      </div>
-
-      {sheetOpen && (
-        <NameSheet
-          initialName={spec.name}
-          busy={busy}
-          saveLabel={editingId ? 'Update chord' : 'Add to song'}
-          onCancel={() => setSheetOpen(false)}
-          onSave={handleSave}
-        />
-      )}
-    </div>
+export default function App() {
+  return (
+    <ThemeProvider>
+      <Router />
+    </ThemeProvider>
   );
 }
