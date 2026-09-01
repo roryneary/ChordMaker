@@ -18,7 +18,7 @@ const SCALES = [1, 1.25] as const;
 /**
  * Keeps the screen awake while the song is open.
  *
- * A phone sleeping mid-verse is the actual failure mode when busking, which is
+ * A phone sleeping mid-verse is the actual failure mode mid-song, which is
  * why this screen exists at all. The lock is dropped by the browser whenever
  * the tab is hidden, so it has to be re-taken on visibilitychange rather than
  * requested once.

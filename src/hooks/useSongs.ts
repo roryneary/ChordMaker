@@ -19,6 +19,16 @@ export type SongsAction =
   | { type: 'REORDER_CHORD'; id: string; chordId: string; to: number }
   | { type: 'PLACE_CHORD'; id: string; wordId: string; chordId: string | null };
 
+/**
+ * A chord's name is what the sheet prints over the word — a nameless one draws
+ * as an em dash on the song screen and as a gap on the printed sheet, so it is
+ * refused here rather than saved and rendered as a hole.
+ */
+export const named = (spec: ChordSpec) => spec.name.trim().length > 0;
+
+const trimName = (spec: ChordSpec): ChordSpec =>
+  spec.name === spec.name.trim() ? spec : { ...spec, name: spec.name.trim() };
+
 /** Applies `change` to one song and stamps it, leaving the rest of the store alone. */
 function editSong(
   store: SongStore,
@@ -80,19 +90,23 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
         };
       });
 
-    case 'ADD_CHORD':
+    case 'ADD_CHORD': {
+      if (!named(action.spec)) return store;
+      const spec = trimName(action.spec);
       return editSong(store, action.id, (s) => {
-        const chord: SavedChord = { id: action.chordId ?? newId(), spec: action.spec };
+        const chord: SavedChord = { id: action.chordId ?? newId(), spec };
         return { ...s, chords: [...s.chords, chord] };
       });
+    }
 
-    case 'UPDATE_CHORD':
+    case 'UPDATE_CHORD': {
+      if (!named(action.spec)) return store;
+      const spec = trimName(action.spec);
       return editSong(store, action.id, (s) => ({
         ...s,
-        chords: s.chords.map((c) =>
-          c.id === action.chordId ? { ...c, spec: action.spec } : c,
-        ),
+        chords: s.chords.map((c) => (c.id === action.chordId ? { ...c, spec } : c)),
       }));
+    }
 
     case 'REMOVE_CHORD':
       return editSong(store, action.id, (s) => {

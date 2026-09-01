@@ -1,6 +1,6 @@
 import { useCallback, useReducer, useState } from 'react';
 import type { Barre, ChordSpec, StringMarker, StringNumber } from '../types/chord';
-import { FRET_COUNT, MAX_ROOT_FRET, MIN_ROOT_FRET, STRING_COUNT } from '../lib/layout';
+import { FRET_COUNT, STRING_COUNT, clampRootFret } from '../lib/layout';
 
 export const emptySpec = (): ChordSpec => ({
   name: '',
@@ -15,13 +15,12 @@ export type Action =
   | { type: 'TOGGLE_DOT'; string: StringNumber; fret: number }
   | { type: 'CYCLE_MARKER'; string: StringNumber }
   | { type: 'SET_ROOT_FRET'; rootFret: number }
+  | { type: 'NUDGE_ROOT_FRET'; by: number }
   | { type: 'COMPLETE_BARRE'; fret: number; a: StringNumber; b: StringNumber }
   | { type: 'REMOVE_BARRE'; fret: number; string: StringNumber }
   | { type: 'SET_NAME'; name: string }
   | { type: 'LOAD'; spec: ChordSpec }
   | { type: 'CLEAR' };
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 const covers = (b: Barre, s: number) => s <= b.fromString && s >= b.toString;
 
@@ -103,7 +102,14 @@ export function chordReducer(spec: ChordSpec, action: Action): ChordSpec {
 
     case 'SET_ROOT_FRET':
       // Dots keep their relative fret, so the shape slides up the neck.
-      return { ...spec, rootFret: clamp(Math.round(action.rootFret), MIN_ROOT_FRET, MAX_ROOT_FRET) };
+      return { ...spec, rootFret: clampRootFret(action.rootFret) };
+
+    /* A step is expressed as a delta and added HERE, against the spec the
+       reducer is holding. A caller that read spec.rootFret and sent an absolute
+       value would lose every step but one in a burst of taps: React batches
+       them, so each handler would compute from the same stale render. */
+    case 'NUDGE_ROOT_FRET':
+      return { ...spec, rootFret: clampRootFret(spec.rootFret + action.by) };
 
     case 'COMPLETE_BARRE': {
       const { fret } = action;

@@ -23,8 +23,15 @@ export interface Song {
   key: string;
   /** Displayed as "steady". A word, deliberately, not a BPM number. */
   feel: string;
-  /** Fret number; null reads as "No capo". */
-  capo: number | null;
+  /**
+   * Fret number. `null` is an explicit "no capo"; **absent** means nobody has
+   * chosen yet, and the two are deliberately different. Defaulting an unasked
+   * song to "No capo" answers the question on the player's behalf, and a capo
+   * transposes every chord on the sheet — so the song screen asks for it before
+   * the song can be called finished. Songs saved before this existed carry
+   * `capo: null` and read as already decided.
+   */
+  capo?: number | null;
   /**
    * The chords, in the order they are played. A FLAT list: verse/chorus
    * sections were removed in design review because they split one chord list in

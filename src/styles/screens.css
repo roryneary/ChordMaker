@@ -26,6 +26,27 @@
 
 button.capo-chip:hover { box-shadow: var(--shadow-md); }
 
+/* An unanswered capo has to read as a question, not as a filled-in answer —
+   a chip that looks the same either way is why it went unnoticed. Dashed and
+   accented, like the empty slots elsewhere in the app. */
+.capo.is-unset {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 55%, transparent);
+  color: var(--color-accent);
+}
+
+button.capo-chip.is-unset:hover {
+  background: var(--tint-bg);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.capo.is-unset .capo-bar {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.capo-statement.is-unset { background: transparent; }
+
 .capo-statement {
   background: var(--tint-bg);
   color: var(--tint-text);
@@ -145,7 +166,10 @@ button.capo-chip:hover { box-shadow: var(--shadow-md); }
   gap: 9px;
 }
 
-.chord-tiles > li { width: 74px; }
+/* 102, not 74: the diagram box carries a reserved numeral column to the right
+   of the grid, so the tile is sized to keep the FRETBOARD the size it was.
+   The list wraps, so a narrow phone simply fits one fewer per row. */
+.chord-tiles > li { width: 102px; }
 
 .chord-tile {
   width: 100%;
@@ -182,7 +206,7 @@ button.capo-chip:hover { box-shadow: var(--shadow-md); }
 .chord-tiles-d { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
 .chord-tiles-d > li { width: auto; }
 .chord-tiles-d .chord-tile { padding: 16px 12px; gap: 8px; }
-.chord-tiles-d .chord-tile .diagram { max-width: 104px; }
+.chord-tiles-d .chord-tile .diagram { max-width: 127px; }
 
 .words-block {
   margin-top: 12px;
@@ -277,6 +301,13 @@ button.capo-chip:hover { box-shadow: var(--shadow-md); }
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: var(--color-surface);
   box-shadow: var(--shadow-lg);
+  /* A short viewport (landscape phone, a window with devtools open) must not
+     push the sheet's last action off the top. dvh so a mobile browser's own
+     toolbar counts against it. */
+  max-height: calc(100vh - 20px);
+  max-height: calc(100dvh - 20px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sheet h2 { font-size: 20px; font-weight: 500; margin-bottom: 14px; }
@@ -291,6 +322,41 @@ button.capo-chip:hover { box-shadow: var(--shadow-md); }
 }
 
 .sheet-remove { margin-top: 14px; }
+
+/* --- The check before "Looks right" -------------------------------------- */
+
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-divider);
+  margin-bottom: 16px;
+}
+
+.check-row > svg { flex: none; color: var(--color-accent); margin-top: 1px; }
+.check-row span { display: flex; flex-direction: column; gap: 3px; }
+.check-row strong { font-size: 15px; font-weight: 400; }
+.check-row em {
+  font-style: normal;
+  font-size: 12px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+}
+.check-row .btn-ghost { flex: none; align-self: center; margin-left: auto; }
+
+.check-ask-q { font-size: 16px; margin: 0 0 3px; }
+.check-ask-why {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+}
+
+/* The fret chips are single ordinals, so they need a floor to stay tappable. */
+.check-ask .chip { min-width: 52px; text-align: center; }
+
+.check-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+.check-actions .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .share-row {
   display: flex;

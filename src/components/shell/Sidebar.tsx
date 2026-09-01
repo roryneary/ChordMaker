@@ -1,11 +1,6 @@
-import {
-  BagSimple,
-  GridFour,
-  Guitar,
-  PencilSimple,
-  PlusCircle,
-} from '@phosphor-icons/react';
+import { BagSimple, GridFour, PencilSimple, PlusCircle } from '@phosphor-icons/react';
 import type { Route } from '../../app/routes';
+import { ChordCreatorLockup } from '../Brand';
 import type { Song } from '../../types/song';
 import { LIBRARY } from '../../data/chordLibrary';
 import { lineCount, unchordedLineCount } from '../../lib/lyric';
@@ -33,8 +28,7 @@ export default function Sidebar({ route, songs, currentId, onGo, onStart }: Prop
   return (
     <aside className="sidebar">
       <div className="brand">
-        <Guitar size={20} weight="fill" />
-        <span>Chord Creator</span>
+        <ChordCreatorLockup size={28} />
       </div>
 
       <button type="button" className="nav-item" onClick={onStart}>
@@ -104,7 +98,7 @@ export default function Sidebar({ route, songs, currentId, onGo, onStart }: Prop
         <span className="avatar">D</span>
         <span className="user-meta">
           <strong>Dan</strong>
-          <em>Busking since March</em>
+          <em>Playing out since March</em>
         </span>
       </div>
     </aside>

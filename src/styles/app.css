@@ -123,18 +123,32 @@ h1, h2, h3, h4 {
   gap: 2px;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 8px 22px;
-  font-size: 16px;
-  font-weight: 500;
+/* The lockup carries its own type, gap and colour — the brand's ratios live in
+   Brand.tsx so one size scales them together. .brand is placement only. */
+.brand { display: flex; align-items: center; padding: 0 8px 22px; }
+.brand-sm { padding: 0; }
+
+/* --- The mark ------------------------------------------------------------ */
+/* The arcs read the theme rather than the brand's literal hex because the two
+   agree exactly: --color-text is the brand's outer ink on both grounds, and
+   --color-accent is its accent, already dropped to accent-600 on light where
+   the base violet fails contrast. Never colour these two independently. */
+
+.cc-lockup { display: inline-flex; align-items: center; text-decoration: none; }
+.cc-mark { flex: none; }
+.cc-arc-outer { stroke: currentColor; }
+.cc-arc-inner { stroke: var(--color-accent); }
+.cc-mark.is-mono .cc-arc-inner { stroke: currentColor; }
+
+.cc-wordmark {
   font-family: var(--font-heading);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.brand svg { color: var(--color-accent); flex: none; }
-.brand-sm { font-size: 14px; padding: 0; }
+.cc-wordmark em { font-style: normal; color: var(--color-accent); }
 
 .nav-item {
   display: flex;
@@ -371,6 +385,8 @@ h1, h2, h3, h4 {
 
 @media (min-width: 1024px) {
   .landing { padding: 40px; }
+  /* The sidebar is already showing the lockup a row away. */
+  .brand-sm { display: none; }
   .display { font-size: 42px; }
   .choices { flex-direction: row; }
   .choice { flex: 1; }
@@ -448,7 +464,7 @@ h1, h2, h3, h4 {
   font-size: 15px;
 }
 
-.chord-cell .diagram { width: 100%; max-width: 68px; }
+.chord-cell .diagram { width: 100%; max-width: 83px; }
 
 .library-empty {
   margin-top: 24px;
@@ -583,7 +599,60 @@ h1, h2, h3, h4 {
   padding: 18px 0 12px;
 }
 
-.editor-plate .plate { width: 230px; }
+.editor-plate .plate { width: 281px; }
+
+/* A setting reads as a ruled row, so it never scans as part of the fretboard
+   above it or the name field below. */
+.position-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  margin-bottom: 10px;
+  padding: 0 2px;
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.position-label {
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.position-stepper { display: flex; align-items: center; gap: 2px; }
+
+.position-step {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.position-step:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+.position-step:disabled {
+  color: color-mix(in srgb, var(--color-text) 25%, transparent);
+  cursor: default;
+}
+
+/* Fixed width and tabular figures so the row does not jump between I and XVII. */
+.position-value {
+  min-width: 58px;
+  text-align: center;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
 
 .editor-name {
   display: block;
@@ -855,3 +924,132 @@ button.word:hover .word-text {
 .library-head { display: flex; align-items: flex-start; gap: 6px; }
 .library-head .icon-btn { margin-left: -8px; flex: none; }
 .chord-cell.is-static { cursor: default; }
+
+
+/* --- The opening --------------------------------------------------------- */
+/* A crossfade needs both halves moving at once, so the app is mounted and laid
+   out from the first frame with the splash over it, and the two transitions
+   run together. See src/app/splash.ts for the phases and their timings — the
+   durations here are the same numbers. */
+
+.app-root {
+  min-height: 100dvh;
+  opacity: 1;
+  transition:
+    opacity 520ms ease,
+    transform 620ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Rendered, laid out, and not yet shown. */
+.app-root.is-veiled {
+  opacity: 0;
+  transform: scale(0.985);
+}
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-bg);
+  transition: opacity 520ms ease;
+}
+
+.splash.is-leaving {
+  opacity: 0;
+  /* Taps during the crossfade belong to the app underneath. */
+  pointer-events: none;
+}
+
+/* A slow accent bloom behind the mark — the only other colour on the screen. */
+.splash-glow {
+  position: absolute;
+  width: min(160vw, 860px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-accent) 26%, transparent) 0%,
+    transparent 62%
+  );
+  /* The gradient is faint over a wide area, which is exactly where 8-bit
+     colour bands into visible rings. The blur costs nothing and removes them. */
+  filter: blur(60px);
+  animation: splash-bloom 1800ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.splash-lockup {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+}
+
+/* Bigger than the lockup's mark, and sized in CSS so it can be viewport-relative
+   — the component's `size` is one number for width and height. */
+.splash-mark {
+  width: clamp(78px, 22vw, 108px);
+  height: auto;
+}
+
+/* The arcs draw themselves on. `from` is deliberately left out of the keyframes
+   so each arc starts from its own dash length below. */
+.splash-mark .cc-arc {
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  animation: splash-draw 820ms cubic-bezier(0.32, 0.72, 0.24, 1) both;
+}
+
+/* 2πr × 240/360, the arcs' true lengths — see Brand.tsx. */
+.splash-mark .cc-arc-outer { --len: 79.6; }
+.splash-mark .cc-arc-inner { --len: 48.2; animation-delay: 190ms; }
+
+.splash-word {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  font-size: clamp(27px, 8vw, 35px);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  animation: splash-rise 620ms cubic-bezier(0.2, 0.7, 0.2, 1) 560ms both;
+}
+
+.splash-word em { font-style: normal; color: var(--color-accent); }
+
+.splash-tag {
+  margin-top: -12px;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--color-text) 48%, transparent);
+  animation: splash-rise 620ms cubic-bezier(0.2, 0.7, 0.2, 1) 760ms both;
+}
+
+@keyframes splash-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes splash-rise {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes splash-bloom {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Reduced motion keeps the brand and drops the movement; splash.ts shortens
+   the hold to match, so it is a brief title card rather than a sequence. */
+@media (prefers-reduced-motion: reduce) {
+  .splash,
+  .app-root { transition-duration: 220ms; }
+  .app-root.is-veiled { transform: none; }
+  .splash-glow,
+  .splash-word,
+  .splash-tag,
+  .splash-mark .cc-arc { animation: none; }
+  .splash-mark .cc-arc { stroke-dashoffset: 0; }
+}

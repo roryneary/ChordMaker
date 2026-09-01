@@ -1,11 +1,11 @@
 import type { Placements, Song, Word } from '../types/song';
-import { VB_H, viewBoxWidth } from './layout';
+import { VB_H, VB_W } from './layout';
 import { chordToPngBlob, sanitizeFilename } from './exportPng';
-import { capoLabel } from '../components/CapoChip';
+import { capoChosen, capoLabel } from '../components/CapoChip';
 import { groupByLine, lineCount } from './lyric';
 
 /**
- * "Print for the case": one A4 page you can read standing up.
+ * "Print for the stand": one A4 page you can read standing up.
  *
  * Not the screen layout scaled down — a sheet. The chords run across the top as
  * a reference row, then the lyric fills the rest at the largest size that still
@@ -139,7 +139,13 @@ export async function songToPdfBlob(
   doc.text(song.title.trim() || 'Untitled', MARGIN, y);
 
   y += META_SIZE + 8;
-  const meta = [song.key && `Key of ${song.key}`, song.feel, capoLabel(song.capo)]
+  // An unanswered capo prints nothing rather than "Capo not set": the sheet on
+  // the stand states what is true of the song, and that is a fact about the app.
+  const meta = [
+    song.key && `Key of ${song.key}`,
+    song.feel,
+    capoChosen(song.capo) && capoLabel(song.capo),
+  ]
     .filter(Boolean)
     .join('   ·   ');
   doc.setFontSize(META_SIZE);
@@ -158,7 +164,7 @@ export async function songToPdfBlob(
       const x = MARGIN + i * (CHORD_W + CHORD_GAP);
       doc.setFontSize(11);
       doc.text(chord.spec.name.trim() || '—', x + CHORD_W / 2, y + 10, { align: 'center' });
-      const h = (CHORD_W * VB_H) / viewBoxWidth(chord.spec.rootFret);
+      const h = (CHORD_W * VB_H) / VB_W;
       doc.addImage(images[i], 'PNG', x, y + 16, CHORD_W, h);
     });
     y += CHORD_ROW_H;

@@ -1,7 +1,9 @@
-import { CaretRight, Guitar, HandTap, MusicNotesPlus } from '@phosphor-icons/react';
+import { CaretRight, HandTap, MusicNotesPlus } from '@phosphor-icons/react';
 import type { Song } from '../types/song';
 import ChordDiagram from '../components/ChordDiagram';
+import { ChordCreatorLockup } from '../components/Brand';
 import { lineCount, unchordedLineCount } from '../lib/lyric';
+import { ordinal } from '../lib/numerals';
 
 interface Props {
   songs: Song[];
@@ -20,12 +22,6 @@ function subLine(song: Song): string {
   if (n) bits.push(`${n} chord${n === 1 ? '' : 's'} in`);
   if (song.capo) bits.push(`capo on the ${ordinal(song.capo)}`);
   return bits.join(' · ') || 'Nothing in it yet';
-}
-
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
 }
 
 function progressTag(song: Song): string | null {
@@ -48,8 +44,7 @@ export default function Landing({ songs, onNewSong, onOneChord, onResume }: Prop
   return (
     <div className="landing">
       <div className="brand brand-sm">
-        <Guitar size={18} weight="fill" />
-        <span>Chord Creator</span>
+        <ChordCreatorLockup size={26} />
       </div>
 
       <p className="greeting">{greeting()}.</p>
@@ -67,8 +62,8 @@ export default function Landing({ songs, onNewSong, onOneChord, onResume }: Prop
             <CaretRight size={16} />
           </span>
           <span className="choice-body">
-            Line up the chords, add the words, and get a sheet you can read on a windy
-            pitch.
+            Line up the chords, add the words, and get a sheet you can read from a
+            stand in a dim room.
           </span>
         </button>
 

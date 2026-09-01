@@ -4,6 +4,8 @@ import ChordPlate from '../components/ChordPlate';
 import { emptySpec, useChordSpec } from '../hooks/useChordSpec';
 import { COMMON_NAMES, findLibraryChord, libraryChordToSpec } from '../data/chordLibrary';
 import { inferChordName } from '../lib/chordName';
+import { MAX_ROOT_FRET, MIN_ROOT_FRET } from '../lib/layout';
+import { ordinal, toRoman } from '../lib/numerals';
 import { specToShape } from '../lib/shape';
 import { useThemeValue } from '../theme/ThemeProvider';
 import type { ChordSpec, StringNumber } from '../types/chord';
@@ -67,6 +69,17 @@ export default function ChordEditor({
     [tapMarker],
   );
 
+  /* The window moves, the shape does not — dots keep their relative fret. The
+     halo is cleared because it marks the finger you just put down, and that is
+     no longer news once the whole grid has moved under it. */
+  const nudgePosition = useCallback(
+    (by: number) => {
+      dispatch({ type: 'NUDGE_ROOT_FRET', by });
+      setActive(null);
+    },
+    [dispatch],
+  );
+
   const pickFromLibrary = useCallback(
     (chordName: string) => {
       const chord = findLibraryChord(chordName);
@@ -78,7 +91,12 @@ export default function ChordEditor({
     [dispatch],
   );
 
+  const atNut = spec.rootFret === MIN_ROOT_FRET;
   const empty = !spec.dots.length && !spec.barres.length;
+  /* The name is what prints over the word, so a shape cannot be saved without
+     one. Most shapes name themselves — this only bites on the ones we cannot
+     recognise, which are exactly the ones the player has to label. */
+  const unnamed = !name.trim();
 
   return (
     <div className="editor">
@@ -113,6 +131,40 @@ export default function ChordEditor({
           />
         </div>
 
+        {/* Where the five-fret window sits on the neck. "Open" rather than "I"
+            at the nut: that is what the nut bar on the diagram means, and it
+            explains why no numeral is drawn there. */}
+        <div className="position-row">
+          <span className="position-label">Position</span>
+          <div className="position-stepper">
+            <button
+              type="button"
+              className="position-step"
+              onClick={() => nudgePosition(-1)}
+              disabled={spec.rootFret <= MIN_ROOT_FRET}
+              aria-label="Move down one fret"
+            >
+              &minus;
+            </button>
+            <span
+              className="position-value"
+              aria-live="polite"
+              aria-label={atNut ? 'Open position' : `Position, ${ordinal(spec.rootFret)} fret`}
+            >
+              {atNut ? 'Open' : toRoman(spec.rootFret)}
+            </span>
+            <button
+              type="button"
+              className="position-step"
+              onClick={() => nudgePosition(1)}
+              disabled={spec.rootFret >= MAX_ROOT_FRET}
+              aria-label="Move up one fret"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
         <label className="sr-only" htmlFor="chord-name">
           Chord name
         </label>
@@ -126,8 +178,12 @@ export default function ChordEditor({
           autoComplete="off"
           spellCheck={false}
         />
-        {inferred && typedName === null && (
+        {inferred && typedName === null ? (
           <p className="editor-guess">We think this one is {inferred}.</p>
+        ) : (
+          !empty && unnamed && (
+            <p className="editor-guess">Give it a name and it&apos;s yours to keep.</p>
+          )
         )}
 
         <hr className="rule" />
@@ -162,7 +218,7 @@ export default function ChordEditor({
         <button
           type="button"
           className="btn-primary btn-block"
-          disabled={empty}
+          disabled={empty || unnamed}
           onClick={() => onSave({ ...spec, name: name.trim() })}
         >
           That's the one

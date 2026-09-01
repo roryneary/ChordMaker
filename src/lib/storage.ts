@@ -1,6 +1,7 @@
 import type { ChordSpec } from '../types/chord';
 import type { Placements, SavedChord, Song, Word } from '../types/song';
 import { newId } from './id';
+import { clampRootFret } from './layout';
 
 /**
  * The song store: many songs keyed by id, plus a pointer at the open one.
@@ -36,7 +37,7 @@ export function newSong(title = ''): Song {
     title,
     key: '',
     feel: '',
-    capo: null,
+    // capo is left absent, not null: nobody has been asked yet. See types/song.ts.
     chords: [],
     lyric: '',
     words: [],
@@ -65,6 +66,20 @@ const isSavedChord = (x: unknown): x is SavedChord =>
   x !== null &&
   typeof (x as SavedChord).id === 'string' &&
   isSpec((x as SavedChord).spec);
+
+/**
+ * rootFret decides whether a nut is drawn and how wide the viewBox is, so a
+ * value from outside the neck would render a diagram with no nut and a numeral
+ * for a fret that does not exist. Clamped rather than rejected: the shape is
+ * still the player's work, it is only sitting in the wrong place.
+ */
+const withValidRootFret = (c: SavedChord): SavedChord => {
+  const rootFret = clampRootFret(c.spec.rootFret);
+  return rootFret === c.spec.rootFret ? c : { ...c, spec: { ...c.spec, rootFret } };
+};
+
+const parseSavedChords = (x: unknown): SavedChord[] =>
+  Array.isArray(x) ? x.filter(isSavedChord).map(withValidRootFret) : [];
 
 const isWord = (x: unknown): x is Word =>
   typeof x === 'object' &&
@@ -95,8 +110,10 @@ export function parseSong(x: unknown): Song | null {
     title: str(raw.title),
     key: str(raw.key),
     feel: str(raw.feel),
-    capo: typeof raw.capo === 'number' ? raw.capo : null,
-    chords: Array.isArray(raw.chords) ? raw.chords.filter(isSavedChord) : [],
+    // Three states, so the null a song was *saved* with survives the trip and
+    // is not confused with a song that has never been asked.
+    capo: typeof raw.capo === 'number' || raw.capo === null ? raw.capo : undefined,
+    chords: parseSavedChords(raw.chords),
     lyric: str(raw.lyric),
     words: Array.isArray(raw.words) ? raw.words.filter(isWord) : [],
     placements: parsePlacements(raw.placements),
@@ -137,7 +154,8 @@ interface StoredV1 {
 /**
  * Wraps the single v1 song as the first entry of the new library. It had no
  * lyric, key, feel or capo — those start empty, which is exactly the state a
- * song is in before the words are pasted.
+ * song is in before the words are pasted. The capo in particular starts
+ * *unanswered* rather than "no capo": v1 never asked, so neither can we say.
  */
 export function migrateV1(raw: string | null): SongStore | null {
   if (!raw) return null;
@@ -146,7 +164,7 @@ export function migrateV1(raw: string | null): SongStore | null {
     if (data?.v !== 1 || typeof data.title !== 'string' || !Array.isArray(data.chords)) {
       return null;
     }
-    const chords = data.chords.filter(isSavedChord);
+    const chords = parseSavedChords(data.chords);
     if (!chords.length && !data.title.trim()) return null; // nothing worth keeping
 
     const song: Song = { ...newSong(data.title), chords };
@@ -188,8 +206,7 @@ export function loadUserChords(): SavedChord[] {
   try {
     const raw = window.localStorage.getItem(USER_CHORDS_KEY);
     if (!raw) return [];
-    const data = JSON.parse(raw) as unknown;
-    return Array.isArray(data) ? data.filter(isSavedChord) : [];
+    return parseSavedChords(JSON.parse(raw) as unknown);
   } catch {
     return [];
   }

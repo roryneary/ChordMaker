@@ -1,5 +1,5 @@
 import type { ChordSpec } from '../types/chord';
-import { VB_H, viewBoxWidth } from './layout';
+import { VB_H, VB_W } from './layout';
 import { EXPORT_INK, EXPORT_PAPER } from '../theme/tokens';
 import { renderChordSVG } from './renderChordSVG';
 
@@ -12,7 +12,7 @@ export const DEFAULT_SCALE = 3;
 export const exportPalette = { ink: EXPORT_INK, paper: EXPORT_PAPER } as const;
 
 /** The drawn size of a chord, which now depends on whether it carries a label. */
-export const chordBox = (spec: ChordSpec) => ({ w: viewBoxWidth(spec.rootFret), h: VB_H });
+export const chordBox = (_spec: ChordSpec) => ({ w: VB_W, h: VB_H });
 
 /**
  * Decodes a chord into a drawable image at `scale` pixels per SVG unit. The

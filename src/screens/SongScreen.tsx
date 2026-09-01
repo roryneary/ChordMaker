@@ -9,11 +9,13 @@ import {
   PencilSimple,
   Plus,
   Printer,
+  Warning,
 } from '@phosphor-icons/react';
-import CapoChip from '../components/CapoChip';
+import CapoChip, { CAPO_FRETS, capoChosen, capoLabel } from '../components/CapoChip';
 import ChordDiagram from '../components/ChordDiagram';
 import LyricBlock from '../components/lyric/LyricBlock';
 import { useIsDesktop } from '../components/shell/useBreakpoint';
+import { ordinal } from '../lib/numerals';
 import { groupByLine, lineCount, unchordedLineCount } from '../lib/lyric';
 import type { SavedChord, Song } from '../types/song';
 
@@ -56,6 +58,12 @@ export default function SongScreen({
 }: Props) {
   const isDesktop = useIsDesktop();
   const [picking, setPicking] = useState<string | null>(null);
+  /**
+   * Latched at the moment the check opens, not read live: choosing the capo
+   * inside the sheet would otherwise pull the question out from under the
+   * finger that just answered it.
+   */
+  const [checking, setChecking] = useState<{ capo: boolean; chords: boolean } | null>(null);
 
   const lines = lineCount(song.lyric);
   const grouped = useMemo(() => groupByLine(song.words, lines), [song.words, lines]);
@@ -63,6 +71,19 @@ export default function SongScreen({
   const toChord = unchordedLineCount(song.words, song.placements, lines);
   const meta = [song.key && `Key of ${song.key}`, song.feel].filter(Boolean).join(' · ');
   const hasLyric = song.lyric.trim().length > 0;
+
+  /**
+   * "Looks right" is a claim about a finished song, so the two things it can be
+   * wrong about get asked first. The capo is a hard stop — it has to be an
+   * answer, not a default — while a song with no chords is only warned about,
+   * because words on their own are a legitimate thing to print.
+   */
+  const finish = useCallback(() => {
+    const capo = !capoChosen(song.capo);
+    const chords = song.chords.length === 0;
+    if (capo || chords) setChecking({ capo, chords });
+    else onReady();
+  }, [song.capo, song.chords.length, onReady]);
 
   const place = useCallback(
     (chordId: string | null) => {
@@ -170,6 +191,97 @@ export default function SongScreen({
     </>
   );
 
+  /**
+   * The gate behind "Looks right". Capo choices are chips here rather than the
+   * CapoChip's own menu: that menu is absolutely positioned, and inside a sheet
+   * that scrolls its own overflow it would be clipped.
+   */
+  const check = checking && (
+    <>
+      <button
+        type="button"
+        className="scrim"
+        aria-label="Close"
+        onClick={() => setChecking(null)}
+      />
+      <div className="sheet" role="dialog" aria-label="Before you call it finished">
+        <i className="grab" />
+        <h2>{checking.capo && checking.chords ? 'Two things first' : 'One thing first'}</h2>
+
+        {checking.chords && (
+          <div className="check-row">
+            <Warning size={20} />
+            <span>
+              <strong>No chords on this song yet</strong>
+              <em>
+                It will print as words on their own. That is allowed — this is only
+                checking you meant it.
+              </em>
+            </span>
+            <button type="button" className="btn-ghost" onClick={onAddChord}>
+              Add one
+            </button>
+          </div>
+        )}
+
+        {checking.capo && (
+          <div className="check-ask">
+            <p className="check-ask-q">
+              {capoChosen(song.capo) ? capoLabel(song.capo) : 'Is there a capo on?'}
+            </p>
+            <p className="check-ask-why">
+              {capoChosen(song.capo)
+                ? 'Change it here if that is not right.'
+                : 'Nobody has said yet, and it moves every chord on the sheet.'}
+            </p>
+            <div className="chips">
+              <button
+                type="button"
+                className={`chip${song.capo === null ? ' is-selected' : ''}`}
+                onClick={() => onCapo(null)}
+              >
+                No capo
+              </button>
+              {CAPO_FRETS.map((fret) => (
+                <button
+                  key={fret}
+                  type="button"
+                  className={`chip${song.capo === fret ? ' is-selected' : ''}`}
+                  onClick={() => onCapo(fret)}
+                  aria-label={`Capo on the ${ordinal(fret)}`}
+                >
+                  {ordinal(fret)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="check-actions">
+          <button
+            type="button"
+            className="btn-primary btn-block"
+            disabled={!capoChosen(song.capo)}
+            onClick={() => {
+              setChecking(null);
+              onReady();
+            }}
+          >
+            {capoChosen(song.capo) ? 'Looks right' : 'Say about the capo first'}
+            <ArrowRight size={16} />
+          </button>
+          <button
+            type="button"
+            className="btn-ghost btn-block"
+            onClick={() => setChecking(null)}
+          >
+            Not yet
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
   if (isDesktop) {
     return (
       <div className="song song-desktop">
@@ -188,13 +300,13 @@ export default function SongScreen({
               spellCheck={false}
             />
             <div className="song-actions-d">
-              <button type="button" className="btn-secondary" onClick={onReady}>
+              <button type="button" className="btn-secondary" onClick={finish}>
                 <Printer size={15} />
-                Print for the case
+                Print for the stand
               </button>
-              <button type="button" className="btn-primary" onClick={onReady}>
+              <button type="button" className="btn-primary" onClick={finish}>
                 <PaperPlaneTilt size={15} />
-                Send to the band
+                Send it to someone
               </button>
             </div>
           </div>
@@ -251,6 +363,7 @@ export default function SongScreen({
           )}
         </div>
         {picker}
+        {check}
       </div>
     );
   }
@@ -305,12 +418,13 @@ export default function SongScreen({
       </div>
 
       <div className="editor-action">
-        <button type="button" className="btn-primary btn-block" onClick={onReady}>
+        <button type="button" className="btn-primary btn-block" onClick={finish}>
           Looks right
           <ArrowRight size={16} />
         </button>
       </div>
       {picker}
+      {check}
     </div>
   );
 }

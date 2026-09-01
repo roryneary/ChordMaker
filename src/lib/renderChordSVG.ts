@@ -31,11 +31,12 @@ import {
   RING_R,
   STRING_COUNT,
   VB_H,
+  VB_W,
   dotY,
   fretLineY,
   stringX,
-  viewBoxWidth,
 } from './layout';
+import { ordinal, toRoman } from './numerals';
 
 export interface RenderOpts {
   mode: 'screen' | 'export';
@@ -79,7 +80,6 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
   const fretCount = spec.fretCount;
   const gridBottom = fretLineY(fretCount);
   const showNut = spec.rootFret === MIN_ROOT_FRET;
-  const vbW = viewBoxWidth(spec.rootFret);
 
   const mono = !accent;
   const dotFill = mono ? `fill="${ink}" fill-opacity="${DOT_ALPHA}"` : `fill="${accent}"`;
@@ -94,7 +94,7 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
   // disappears in dark-mode viewers. On screen it stays transparent so the
   // diagram sits on whatever card holds it.
   if (paper) {
-    parts.push(`<rect x="0" y="0" width="${vbW}" height="${VB_H}" fill="${paper}"/>`);
+    parts.push(`<rect x="0" y="0" width="${VB_W}" height="${VB_H}" fill="${paper}"/>`);
   }
 
   // Gridlines: frets then strings, one group sharing the ink strength.
@@ -121,11 +121,15 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
         `fill="${ink}" fill-opacity="${NUT_ALPHA}"/>`,
     );
   } else {
-    // Up the neck there is no nut, so the position label says where we are.
+    /* Up the neck there is no nut, so a roman numeral says which fret the
+       window starts on. It sits in the column to the right of string 1, on the
+       centre line of the fret it names. That column is reserved on every
+       diagram, so carrying a numeral never costs the fretboard any width —
+       see the note on VB_W. */
     parts.push(
       `<text x="${LABEL_X}" y="${n(dotY(1))}" text-anchor="start" ` +
         `dominant-baseline="central" fill="${ink}" fill-opacity="${MARKER_ALPHA}" ` +
-        `font-family="${SANS}" font-size="${LABEL_SIZE}">${spec.rootFret}fr</text>`,
+        `font-family="${SANS}" font-size="${LABEL_SIZE}">${toRoman(spec.rootFret)}</text>`,
     );
   }
 
@@ -188,13 +192,17 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
 
   const size =
     mode === 'export'
-      ? ` width="${n(vbW * scale)}" height="${n(VB_H * scale)}"`
+      ? ` width="${n(VB_W * scale)}" height="${n(VB_H * scale)}"`
       : ' width="100%"';
 
-  const label = spec.name.trim() ? `${spec.name.trim()} chord diagram` : 'Chord diagram';
+  /* "VII" is read out as three letters, so the position goes into the label in
+     words. Nothing is said at the nut: that is where a chord is unless told
+     otherwise, and the nut bar carries it visually. */
+  const named = spec.name.trim() ? `${spec.name.trim()} chord diagram` : 'Chord diagram';
+  const label = showNut ? named : `${named}, ${ordinal(spec.rootFret)} fret`;
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vbW} ${VB_H}"${size} ` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB_W} ${VB_H}"${size} ` +
     `role="img" aria-label="${esc(label)}">${parts.join('')}</svg>`
   );
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderChordSVG } from '../renderChordSVG';
 import { chordFilename, exportPalette } from '../exportPng';
 import { chordReducer, emptySpec } from '../../hooks/useChordSpec';
-import { VB_H, VB_W, VB_W_LABELLED } from '../layout';
+import { ACTIVE_ALPHA, DOT_ALPHA, MAX_ROOT_FRET, VB_H, VB_W } from '../layout';
 
 const INK = '#292b31';
 const screen = { mode: 'screen', ink: INK } as const;
@@ -31,8 +31,8 @@ describe('renderChordSVG', () => {
 
   it('sizes the export explicitly', () => {
     const head = renderChordSVG(withDot(), { mode: 'export', scale: 3, ink: INK });
-    expect(head.slice(0, head.indexOf('>'))).toContain('width="300"');
-    expect(head.slice(0, head.indexOf('>'))).toContain('height="366"');
+    expect(head.slice(0, head.indexOf('>'))).toContain(`width="${VB_W * 3}"`);
+    expect(head.slice(0, head.indexOf('>'))).toContain(`height="${VB_H * 3}"`);
   });
 
   /* The rule the whole export path rests on: a serialised SVG carries none of
@@ -53,14 +53,33 @@ describe('renderChordSVG', () => {
     expect(svg).not.toContain(INK);
   });
 
-  it('draws a nut bar at the first position and a label above it', () => {
+  it('draws a nut bar at the first position and a numeral away from it', () => {
     expect(atFret(1)).toContain('height="3.6"');
-    expect(atFret(1)).not.toContain('fr<');
-    // Up the neck there is no nut, so the label says where we are — and the
-    // box widens to make room for it.
+    // No numeral at the nut: the bar already says "open position".
+    expect(atFret(1)).not.toContain('<text');
+    expect(atFret(1)).toContain(`viewBox="0 0 ${VB_W} ${VB_H}"`);
+    // Up the neck there is no nut, so the numeral says where we are, beside the
+    // fret it names. The box is the SAME either way, so the two fretboards
+    // render at identical size in adjacent tiles.
     expect(atFret(7)).not.toContain('height="3.6"');
-    expect(atFret(7)).toContain('>7fr<');
-    expect(atFret(7)).toContain(`viewBox="0 0 ${VB_W_LABELLED} ${VB_H}"`);
+    expect(atFret(7)).toContain('>VII<');
+    expect(atFret(7)).toContain(`viewBox="0 0 ${VB_W} ${VB_H}"`);
+  });
+
+  it('writes the position as a roman numeral the length of the neck', () => {
+    expect(atFret(4)).toContain('>IV<');
+    expect(atFret(9)).toContain('>IX<');
+    expect(atFret(MAX_ROOT_FRET)).toContain('>XVII<');
+  });
+
+  it('spells the position out in the accessible label, since "VII" reads as letters', () => {
+    expect(renderChordSVG({ ...withDot(), name: 'B', rootFret: 7 }, screen)).toContain(
+      'aria-label="B chord diagram, 7th fret"',
+    );
+    // Nothing is said at the nut: that is where a chord is unless told otherwise.
+    expect(renderChordSVG({ ...withDot(), name: 'B' }, screen)).toContain(
+      'aria-label="B chord diagram"',
+    );
   });
 
   it('leaves the chord name to the DOM, but still labels the image', () => {
@@ -90,6 +109,17 @@ describe('renderChordSVG', () => {
     expect(active).toContain('r="7.2"');
   });
 
+  /* The finger you have just put down must not read as provisional: it was
+     drawn at half the ink of a settled dot, so a placement only looked
+     committed once the next tap took the halo off it. */
+  it('never draws the just-placed finger fainter than a settled one', () => {
+    expect(ACTIVE_ALPHA).toBeGreaterThanOrEqual(DOT_ALPHA);
+    const active = renderChordSVG(withDot(), { ...screen, active: 5 });
+    const dot = active.slice(active.indexOf('<circle'));
+    const alpha = dot.match(/fill-opacity="([\d.]+)"/);
+    expect(Number(alpha ? alpha[1] : 1)).toBeGreaterThanOrEqual(DOT_ALPHA);
+  });
+
   /* Learned the hard way in the design prototype: templated text nodes failed
      to lay out and all 144 markers rendered zero-width, which makes x32010
      musically ambiguous. They must be shapes. */
@@ -106,14 +136,14 @@ describe('renderChordSVG', () => {
   });
 
   it('slides the shape up the neck without redrawing it', () => {
-    // Strip the three things that are allowed to differ: the nut bar, the
-    // label, and the top fret line that replaces the nut.
+    // Strip everything that is allowed to differ: the nut bar, the numeral and
+    // its spoken twin in the label, and the top fret line replacing the nut.
     const shape = (svg: string) =>
       svg
         .replace(/<rect x="8.6"[^>]*\/>/, '')
-        .replace(/<text[^>]*>\d+fr<\/text>/, '')
-        .replace(/<line x1="10" y1="24" x2="90" y2="24"\/>/, '')
-        .replace(/viewBox="0 0 \d+ 122"/, 'viewBox');
+        .replace(/<text[^>]*>[IVX]+<\/text>/, '')
+        .replace(/, \d+\w\w fret"/, '"')
+        .replace(/<line x1="10" y1="24" x2="90" y2="24"\/>/, '');
     expect(shape(atFret(7))).toBe(shape(atFret(1)));
   });
 });

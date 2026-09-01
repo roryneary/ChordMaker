@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BagSimple, PaperPlaneTilt, Printer } from '@phosphor-icons/react';
+import { BagSimple, CaretLeft, PaperPlaneTilt, Printer } from '@phosphor-icons/react';
 import CapoChip from '../components/CapoChip';
 import ChordDiagram from '../components/ChordDiagram';
 import LyricBlock from '../components/lyric/LyricBlock';
@@ -25,8 +25,23 @@ export default function Ready({ song, nameOf, onClose, onPrint, printing }: Prop
 
   return (
     <div className="ready">
+      {/* The screen's own way out. It used to depend on the share sheet's "Not
+          yet" button, so dismissing the sheet by its scrim left the screen with
+          no exit at all — mobile gives this route no tab bar. */}
+      <div className="editor-bar">
+        <button type="button" className="icon-btn accent" onClick={onClose} aria-label="Back">
+          <CaretLeft size={20} />
+        </button>
+        <span className="spacer" />
+        {!sheetOpen && (
+          <button type="button" className="btn-ghost" onClick={() => setSheetOpen(true)}>
+            Where&apos;s it going?
+          </button>
+        )}
+      </div>
+
       <div className="ready-body">
-        <p className="kicker">Ready for the pitch</p>
+        <p className="kicker">Ready for the room</p>
         <h1 className="display-lg">{song.title.trim() || 'Untitled'}</h1>
         {meta && <p className="ready-meta">{meta}</p>}
 
@@ -78,7 +93,7 @@ export default function Ready({ song, nameOf, onClose, onPrint, printing }: Prop
             >
               <Printer size={22} />
               <span>
-                <strong>{printing ? 'Building the page…' : 'Print for the case'}</strong>
+                <strong>{printing ? 'Building the page…' : 'Print for the stand'}</strong>
                 <em>One A4 page, big enough to read standing up</em>
               </span>
             </button>
@@ -86,7 +101,7 @@ export default function Ready({ song, nameOf, onClose, onPrint, printing }: Prop
             <button type="button" className="share-row" disabled>
               <PaperPlaneTilt size={22} />
               <span>
-                <strong>Send to the band</strong>
+                <strong>Send it to someone</strong>
                 <em>A link that opens without the app — not built yet</em>
               </span>
             </button>

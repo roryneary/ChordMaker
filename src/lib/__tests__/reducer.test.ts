@@ -87,6 +87,22 @@ describe('invariants', () => {
     expect(s.dots).toEqual([{ string: 5, fret: 3 }]);
   });
 
+  it('steps the window by a delta, so a burst of taps is not lost to one render', () => {
+    /* The stepper dispatches a delta rather than spec.rootFret + 1. React
+       batches taps that land in one task, so an absolute value computed in the
+       component would have every step but the first read the same stale spec. */
+    let s = dot(emptySpec(), 5, 3);
+    for (let i = 0; i < 6; i++) s = chordReducer(s, { type: 'NUDGE_ROOT_FRET', by: 1 });
+    expect(s.rootFret).toBe(7);
+    expect(s.dots).toEqual([{ string: 5, fret: 3 }]);
+
+    // And it stops at the ends of the neck rather than running off them.
+    for (let i = 0; i < 50; i++) s = chordReducer(s, { type: 'NUDGE_ROOT_FRET', by: 1 });
+    expect(s.rootFret).toBe(17);
+    for (let i = 0; i < 50; i++) s = chordReducer(s, { type: 'NUDGE_ROOT_FRET', by: -1 });
+    expect(s.rootFret).toBe(1);
+  });
+
   it('never lets a string carry a dot and barre coverage at the SAME fret', () => {
     let s = dot(emptySpec(), 4, 2);
     s = chordReducer(s, { type: 'COMPLETE_BARRE', fret: 2, a: 6, b: 2 });

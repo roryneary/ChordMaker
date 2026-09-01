@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ChordSpec, StringNumber } from '../types/chord';
 import type { PendingBarre } from '../hooks/useChordSpec';
-import { STRING_COUNT, cellRectPct, markerRectPct, viewBoxWidth } from '../lib/layout';
+import { STRING_COUNT, cellRectPct, markerRectPct } from '../lib/layout';
 import { renderChordSVG } from '../lib/renderChordSVG';
 
 interface Props {
@@ -116,10 +116,6 @@ export default function ChordPlate({
     [spec, ink, active],
   );
 
-  // A diagram up the neck is wider, because it carries a "5fr" label. The
-  // overlay's percentages are of that same box or the buttons drift off it.
-  const vbW = viewBoxWidth(spec.rootFret);
-
   const frets = Array.from({ length: spec.fretCount }, (_, i) => i + 1);
 
   /** Highlights the strings a drag currently spans, so the barre is visible. */
@@ -148,7 +144,7 @@ export default function ChordPlate({
       >
         {/* Markers first, so a grid cell wins any overlap in hit-testing. */}
         {STRINGS.map((s) => {
-          const r = markerRectPct(s, vbW);
+          const r = markerRectPct(s);
           const state = spec.markers[s - 1] ?? 'none';
           return (
             <button
@@ -171,7 +167,7 @@ export default function ChordPlate({
 
         {STRINGS.map((s) =>
           frets.map((f) => {
-            const r = cellRectPct(s, f, vbW);
+            const r = cellRectPct(s, f);
             const isAnchor =
               pendingBarre !== null && pendingBarre.string === s && pendingBarre.fret === f;
             return (

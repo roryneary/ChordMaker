@@ -48,23 +48,50 @@ export const GRID_ALPHA   = 0.34;
 export const NUT_ALPHA    = 0.74;
 export const MARKER_ALPHA = 0.62;
 export const DOT_ALPHA    = 0.88;
-export const ACTIVE_ALPHA = 0.42;
+/* The just-placed finger is the STRONGEST dot on the board, never the faintest.
+   It was 0.42 — half the ink of a settled dot — so the finger you had just put
+   down looked provisional and only "committed" when the next tap moved the halo
+   off it. The halo alone says which one is new. */
+export const ACTIVE_ALPHA = 1;
 export const RING_ALPHA   = 0.55;
 
+/**
+ * EVERY diagram is this box, whether or not it carries a position numeral.
+ *
+ * The grid is 80 wide and the numeral column to its right is the rest. That
+ * column is reserved on every chord, drawn or not, because containers size a
+ * diagram by its WIDTH: a box that grew only when it carried a numeral drew its
+ * fretboard 19% smaller than the nut-position chord in the tile beside it. A
+ * fixed box costs a little space under an open chord and keeps every fretboard
+ * in the app identical, which is what matters on a stand.
+ *
+ * Since the box never changes shape, nothing downstream asks how wide a
+ * particular chord is — the overlay, the PNG and the PDF all just use VB_W.
+ */
+export const VB_W = 122;
 export const VB_H = 122;
-/** Every diagram in the design sits at the nut, so 100 is the common width. */
-export const VB_W = 100;
-/** Up the neck, "5fr" needs its own column to the right of string 1. */
-export const VB_W_LABELLED = 116;
-export const LABEL_X = 100;
+
+/**
+ * The numeral names the fret at the TOP of the window, so it is set on that
+ * row's centre line — dotY(1) — not floated in the corner.
+ *
+ * x is the left edge of the column. It clears string 1 (x 90) plus a DOT_R,
+ * not just the grid line: a barre chord up the neck — which is most of what
+ * lives up there — puts a dot or a bar end at x 96.6, and a numeral tucked
+ * against the grid disappears underneath it. "XVII" measures 21 units at this
+ * size, so the column runs 99 → 120 inside a 122 box. It cannot be measured at
+ * runtime (the export path renders through canvas with no DOM), so
+ * layout.test.ts guards the arithmetic instead.
+ */
+export const LABEL_X = 99;
 export const LABEL_SIZE = 11;
 
 export const MIN_ROOT_FRET = 1;
 export const MAX_ROOT_FRET = 17;
 
-/** A diagram only widens when it has a position label to carry. */
-export const viewBoxWidth = (rootFret: number): number =>
-  rootFret > MIN_ROOT_FRET ? VB_W_LABELLED : VB_W;
+/** The only place the neck's length is enforced — the reducer and the loader share it. */
+export const clampRootFret = (n: number): number =>
+  Math.min(MAX_ROOT_FRET, Math.max(MIN_ROOT_FRET, Math.round(n)));
 
 /** String 6 sits at GRID_LEFT, string 1 at GRID_LEFT + GRID_W. */
 export const stringX  = (s: number) => GRID_LEFT + (STRING_COUNT - s) * CELL_W;
@@ -82,26 +109,22 @@ export interface RectPct {
 
 const pct = (px: number, of: number) => (px / of) * 100;
 
-/**
- * Hit rect for the cell of string `s` at relative fret `f` (1-based).
- * `vbW` must match the width the artwork was drawn at, or the overlay drifts
- * off the diagram on labelled (up-the-neck) chords.
- */
-export function cellRectPct(s: number, f: number, vbW: number = VB_W): RectPct {
+/** Hit rect for the cell of string `s` at relative fret `f` (1-based). */
+export function cellRectPct(s: number, f: number): RectPct {
   return {
-    left:   pct(stringX(s) - CELL_W / 2, vbW),
+    left:   pct(stringX(s) - CELL_W / 2, VB_W),
     top:    pct(fretLineY(f - 1), VB_H),
-    width:  pct(CELL_W, vbW),
+    width:  pct(CELL_W, VB_W),
     height: pct(CELL_H, VB_H),
   };
 }
 
 /** Hit rect for the x/o marker slot above string `s`. */
-export function markerRectPct(s: number, vbW: number = VB_W): RectPct {
+export function markerRectPct(s: number): RectPct {
   return {
-    left:   pct(stringX(s) - CELL_W / 2, vbW),
+    left:   pct(stringX(s) - CELL_W / 2, VB_W),
     top:    0,
-    width:  pct(CELL_W, vbW),
+    width:  pct(CELL_W, VB_W),
     height: pct(MARKER_ROW_H, VB_H),
   };
 }

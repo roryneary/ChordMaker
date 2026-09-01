@@ -6,9 +6,11 @@ import Landing from './screens/Landing';
 import Library from './screens/Library';
 import Ready from './screens/Ready';
 import SongScreen from './screens/SongScreen';
+import Splash from './screens/Splash';
 import WordsEditor from './screens/WordsEditor';
 import { type Route, useRoute } from './app/routes';
-import { useSongs } from './hooks/useSongs';
+import { useSplash } from './app/splash';
+import { named, useSongs } from './hooks/useSongs';
 import { findLibraryChord, libraryChordToSpec } from './data/chordLibrary';
 import { newId } from './lib/id';
 import { downloadBlob } from './lib/exportPng';
@@ -46,7 +48,10 @@ function Router() {
 
   /** "Just one chord" belongs to no song — it goes to the user's own shapes. */
   const saveLooseChord = useCallback((spec: ChordSpec) => {
-    saveUserChords([...loadUserChords(), { id: newId(), spec }]);
+    // Same rule as the songs reducer: nothing nameless gets stored.
+    if (!named(spec)) return;
+    const trimmed = { ...spec, name: spec.name.trim() };
+    saveUserChords([...loadUserChords(), { id: newId(), spec: trimmed }]);
   }, []);
 
   const startSong = useCallback(() => {
@@ -224,9 +229,18 @@ function Router() {
 }
 
 export default function App() {
+  const { phase, skip } = useSplash();
+
   return (
     <ThemeProvider>
-      <Router />
+      {/* The app is mounted and laid out from the first frame, behind the
+          splash rather than after it: a crossfade needs both halves moving at
+          once, and a home screen that only began rendering when the splash
+          left would arrive a beat late. */}
+      <div className={`app-root${phase === 'hold' ? ' is-veiled' : ''}`}>
+        <Router />
+      </div>
+      {phase !== 'gone' && <Splash leaving={phase !== 'hold'} onSkip={skip} />}
     </ThemeProvider>
   );
 }
