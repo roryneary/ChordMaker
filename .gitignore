@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Env vars (hold the Firebase project config; copy from .env.example)
+.env
+.env.*
+!.env.example
+
+# Firebase emulator / debug output
+.firebase
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,0 +1,43 @@
+rules_version = '2';
+
+/*
+ * Two collections, and the split between them is the whole design.
+ *
+ * A user's songs live under their own uid, so the path is the owner of record
+ * and the rule is one line — see ROADMAP.md §1. Usernames cannot live there:
+ * a handle has to be unique across everyone, and Firestore has no unique
+ * constraint, so the claim is a document whose ID *is* the handle. A document
+ * id can only exist once, which is the constraint, and `create` on an existing
+ * path fails — so two people racing for the same name, one loses cleanly.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Everything a signed-in user owns. Nobody else reads it.
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /usernames/{handle} {
+      // Readable by anyone signed in: this is the availability check, and
+      // later the lookup that turns a handle into a uid when sharing.
+      allow read: if request.auth != null;
+
+      // Claim only what is free, only for yourself, and only a handle that
+      // matches the normalised form the client promises to send. Validating
+      // the shape here as well as in `lib/username.ts` means a hand-rolled
+      // write cannot squat `Admin`, a 200-character name, or someone else's.
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.keys().hasOnly(['uid', 'display', 'claimedAt'])
+                    && handle.matches('^[a-z0-9][a-z0-9_.]{1,23}$')
+                    && request.resource.data.display is string
+                    && request.resource.data.display.size() <= 24;
+
+      // A handle is released by its owner, never edited: renaming is a delete
+      // and a fresh claim, so the id and the uid inside it can never disagree.
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}

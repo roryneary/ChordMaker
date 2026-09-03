@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * Six screens and a back-stack. No router library: this is a small state
+ * Seven screens and a back-stack. No router library: this is a small state
  * machine, and the codebase carries neither a router nor a state library.
  *
  * The stack exists because full screen specifies "exit returns to the previous
@@ -14,7 +14,8 @@ export type Route =
   | { name: 'song'; songId: string }
   | { name: 'fullScreen'; songId: string }
   | { name: 'ready'; songId: string }
-  | { name: 'library' };
+  | { name: 'library' }
+  | { name: 'signIn' };
 
 export const LANDING: Route = { name: 'landing' };
 
@@ -24,6 +25,8 @@ export function toHash(route: Route): string {
       return '#/';
     case 'library':
       return '#/library';
+    case 'signIn':
+      return '#/signin';
     case 'chordEditor':
       return `#/chord/${route.songId ?? 'new'}/${route.chordId ?? 'new'}`;
     case 'words':
@@ -42,6 +45,7 @@ export function fromHash(hash: string): Route {
   if (!parts.length) return LANDING;
 
   if (parts[0] === 'library') return { name: 'library' };
+  if (parts[0] === 'signin') return { name: 'signIn' };
 
   if (parts[0] === 'chord') {
     const songId = parts[1] && parts[1] !== 'new' ? parts[1] : null;

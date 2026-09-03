@@ -78,8 +78,14 @@ const withValidRootFret = (c: SavedChord): SavedChord => {
   return rootFret === c.spec.rootFret ? c : { ...c, spec: { ...c.spec, rootFret } };
 };
 
+/** A single chord from an untrusted source — the sibling of `parseSong`,
+    and what Firestore documents in `chordSync.ts` are read through. */
+export function parseSavedChord(x: unknown): SavedChord | null {
+  return isSavedChord(x) ? withValidRootFret(x) : null;
+}
+
 const parseSavedChords = (x: unknown): SavedChord[] =>
-  Array.isArray(x) ? x.filter(isSavedChord).map(withValidRootFret) : [];
+  Array.isArray(x) ? x.map(parseSavedChord).filter((c): c is SavedChord => c !== null) : [];
 
 const isWord = (x: unknown): x is Word =>
   typeof x === 'object' &&

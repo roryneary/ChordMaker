@@ -1053,3 +1053,76 @@ button.word:hover .word-text {
   .splash-mark .cc-arc { animation: none; }
   .splash-mark .cc-arc { stroke-dashoffset: 0; }
 }
+
+/* --- Account ------------------------------------------------------------- */
+/* The sidebar chip is a button when signed out and a panel when signed in, so
+   the shared look lives on .user-chip and only the affordance is added here. */
+.user-chip.is-action {
+  width: 100%;
+  border: 1px solid var(--color-divider);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.user-chip.is-action:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.user-chip .btn-ghost { margin-left: auto; font-size: 12px; }
+
+.signin {
+  max-width: 380px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.signin .brand { margin-top: var(--space-2); }
+
+.signin-sub {
+  margin: 0 0 var(--space-2);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.signin-google {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* A rule with the word sitting in it, rather than a rule and a floating word. */
+.signin-or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  font-size: 12px;
+  text-transform: lowercase;
+}
+.signin-or::before,
+.signin-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-divider);
+}
+
+.signin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.signin-form .micro-label { margin-top: var(--space-1); }
+.signin-form .btn-block { margin-top: var(--space-2); }
+
+.signin-hint { margin: 2px 0 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+/* Errors are a colour and a sentence, never an icon and a code. */
+.signin-error { margin: 2px 0 0; font-size: 13px; color: var(--color-danger); }
+
+.signin-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}

@@ -38,6 +38,12 @@
   --color-accent: var(--color-accent-600);
   --color-divider: color-mix(in srgb, #292b31 15%, transparent);
 
+  /* The only non-accent hue in the system. Sign-in is the first screen that
+     has to say "that is wrong" rather than merely "that is quiet", and a
+     dimmed grey is not a refusal. Darker on light, lighter on dark, so it
+     clears contrast on both grounds. */
+  --color-danger: #b3261e;
+
   /* accent-400, NOT accent-200 — see tokens.ts. */
   --tint-bg: var(--color-accent-400);
   --tint-text: var(--color-accent-700);
@@ -77,6 +83,7 @@
     --color-text: #e9e9ed;
     --color-accent: #9184d9;
     --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+    --color-danger: #f2b8b5;
 
     --tint-bg: var(--color-accent-900);
     --tint-text: var(--color-accent-200);
@@ -101,6 +108,7 @@
   --color-text: #e9e9ed;
   --color-accent: #9184d9;
   --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+  --color-danger: #f2b8b5;
 
   --tint-bg: var(--color-accent-900);
   --tint-text: var(--color-accent-200);

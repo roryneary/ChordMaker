@@ -4,8 +4,9 @@ Build a song sheet: tap out the chord shapes, paste the whole lyric in one go, d
 names onto the words they land on, then read it full-screen on a windy pitch or print it on
 one A4 page.
 
-Single user, no accounts, no backend. Everything lives in `localStorage` and works with no
-signal.
+Songs live in `localStorage` and the app works with no signal. Accounts exist on top of that
+rather than in front of it: you can build a whole sheet without ever signing in, and signing in
+is what earns a name to share songs under and, in time, a copy on every device you play from.
 
 ```
 npm install
@@ -142,6 +143,59 @@ the hold short, and reduced motion drops the draw-on and shortens every phase �
 chords over the words. `a4SheetLayout` is a pure, tested function that steps the type size down
 until the lyric fits rather than spilling onto a second sheet, and reports `overflows` rather
 than clipping silently.
+
+## Accounts and the username
+
+Sign-in is Google or email and password (`lib/auth.ts`), and it is deliberately not a wall —
+the sidebar chip is the only way in, and every screen works without it.
+
+The part worth understanding is the **handle**. A shared song is a copy that outlives the link
+that carried it, so whatever names the sender is baked permanently into someone else's library
+— which is why it is a handle and never the email address. An account without one is a
+half-finished sign-in, so `App.tsx` keeps the claim step in front of the user until it is done.
+
+Firestore has no unique constraint, so the claim is a document whose **id is the handle**
+(`usernames/{handle} -> { uid }`): a document id can only exist once, and that is the whole
+uniqueness mechanism. It is written in a transaction, because reading "free" and then writing
+is a race two people can both win. `firestore.rules` re-validates the shape server-side, and
+refuses `update` outright — renaming is delete-then-claim, so a claim's id and the uid inside
+it can never drift apart. `lib/username.ts` holds the pure rules (normalising, the reserved
+list, what a legal handle is) and they are tested; keep its pattern and the one in the rules
+in step.
+
+## Hosting and the Firebase config
+
+Netlify builds and serves it. [`netlify.toml`](netlify.toml) holds the build command, the
+publish directory and a pinned Node version, in the repo rather than in the site UI so the
+build cannot be misconfigured by a click. It also carries the usual SPA redirect, which this
+app does not actually need — routes live in the URL hash, so the server only ever sees a
+request for `/` and there is no deep path to 404. It is insurance against routing ever moving
+to real paths.
+
+`src/lib/firebase.ts` is the remote half of the store, sitting beside `storage.ts`. The web
+config arrives through `VITE_FIREBASE_*` env vars — copy `.env.example` to `.env` locally, and
+set the same keys in Netlify. Those values are **not secret**: the web config identifies the
+project and is compiled into the bundle by design, and Firestore rules plus Auth are what
+secure the data. Netlify's secrets scanner will still fail the build for finding them in the
+output, which is what `SECRETS_SCAN_OMIT_KEYS` answers.
+
+**Nothing in that module throws on import, and nothing initialises until it is asked to.** A
+checkout with no `.env` is a supported state: the app's premise is that it works with no
+account and no signal, so an absent config has to leave every screen working on `localStorage`
+rather than white-screening the app before it renders. Callers check `firebaseEnabled` and
+degrade. Being lazy also keeps the SDK out of the first chunk for a player who never signs in:
+`hooks/useAuth.ts` imports the module, but nothing it exports runs until a screen asks for the
+auth or the database.
+
+There is **no Cloud Storage**, deliberately. Everything persisted is small JSON: a song is well
+under 20 kB against Firestore's 1 MiB document limit, and the PNG and PDF are generated in the
+browser at the moment you export them. A stored export would only ever be a stale copy of
+something a second of work regenerates.
+
+One deployment gotcha worth knowing before the first sign-in lands: Firebase Auth checks the
+calling domain against its **Authorized domains** list, and Netlify deploy previews get
+generated hostnames that will not be on it. Sign-in works in production and fails on previews
+until those domains are added.
 
 ## Not built
 

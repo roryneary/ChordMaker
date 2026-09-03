@@ -1,0 +1,28 @@
+# Netlify deploy settings, kept in the repo so the build cannot be misconfigured
+# in the UI: a site published from the repo root would serve the dev index.html
+# (which points at /src/main.tsx) and render a blank page.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Pinned rather than left to Netlify's default, which moves. Vite 8 needs
+  # Node 20.19+ / 22.12+.
+  NODE_VERSION = "22"
+
+  # Netlify's secrets scanner fails a build when it finds an env var's value in
+  # the published output. Every VITE_ var is inlined into the bundle by design,
+  # and the Firebase web config is public information — it identifies the
+  # project, it does not authorise anything. Firestore rules and Auth are what
+  # secure the data. Nothing that IS secret may ever be named here.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID"
+
+# Insurance, not a requirement: this app's routes live in the URL hash
+# (`#/song/abc/words` — see src/app/routes.ts), so the server only ever sees a
+# request for "/" and there is no deep path to 404. The rule costs nothing and
+# is what stops every link breaking if routing ever moves to real paths.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

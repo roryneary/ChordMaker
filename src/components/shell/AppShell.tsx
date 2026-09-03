@@ -1,11 +1,16 @@
 import type { ReactNode } from 'react';
 import type { Route } from '../../app/routes';
 import type { Song } from '../../types/song';
+import type { Account } from '../../hooks/useAuth';
 import Sidebar from './Sidebar';
 import TabBar from './TabBar';
 import { useIsDesktop } from './useBreakpoint';
 
 interface Props {
+  /** Null when signed out, or when Firebase is not configured at all. */
+  account: Account | null;
+  onAccount: () => void;
+  onSignOut: () => Promise<void>;
   route: Route;
   /** The screen beneath this one, which decides whether the library is a
       destination or a step inside an editing flow. */
@@ -44,6 +49,9 @@ export function chromeFor(
   previous?: Route,
 ): 'sidebar' | 'tabs' | 'none' {
   if (route.name === 'fullScreen') return 'none';
+  /* Sign-in carries its own way out, and the claim step must not be walked
+     away from by a sidebar click while the account is still half-made. */
+  if (route.name === 'signIn') return 'none';
   if (isDesktop) return 'sidebar';
   if (route.name === 'landing') return 'tabs';
   if (route.name === 'library') return libraryIsStep(previous) ? 'none' : 'tabs';
@@ -51,6 +59,9 @@ export function chromeFor(
 }
 
 export default function AppShell({
+  account,
+  onAccount,
+  onSignOut,
   route,
   previous,
   songs,
@@ -66,6 +77,9 @@ export default function AppShell({
     <div className={`shell shell-${chrome}`}>
       {chrome === 'sidebar' && (
         <Sidebar
+          account={account}
+          onAccount={onAccount}
+          onSignOut={onSignOut}
           route={route}
           songs={songs}
           currentId={currentId}

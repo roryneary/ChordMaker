@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useReducer } from 'react';
+import { useEffect, useMemo, useReducer, useRef } from 'react';
 import type { ChordSpec } from '../types/chord';
 import type { SavedChord, Song } from '../types/song';
 import { newId } from '../lib/id';
 import { prunePlacements, pruneToChords, retokenise } from '../lib/lyric';
 import { type SongStore, loadStore, newSong, saveStore } from '../lib/storage';
+import { firebaseEnabled } from '../lib/firebase';
+import { deleteRemoteSong, fetchRemoteSongs, pushSongs, writeSong } from '../lib/songSync';
+import { lastSyncedUid, mergeOnSignIn, rememberSyncedUid } from '../lib/accountSync';
 
 export type SongsAction =
+  | { type: 'HYDRATE'; songs: Song[] }
   | { type: 'CREATE_SONG'; title: string; id?: string }
   | { type: 'OPEN_SONG'; id: string | null }
   | { type: 'DELETE_SONG'; id: string }
@@ -48,6 +52,15 @@ function editSong(
 
 export function songsReducer(store: SongStore, action: SongsAction): SongStore {
   switch (action.type) {
+    case 'HYDRATE': {
+      // Keeps the open song open if the merge still has it; falls back rather
+      // than pointing at nothing, same as OPEN_SONG's own guard.
+      const currentId = action.songs.some((s) => s.id === store.currentId)
+        ? store.currentId
+        : (action.songs[0]?.id ?? null);
+      return { songs: action.songs, currentId };
+    }
+
     case 'CREATE_SONG': {
       const song = { ...newSong(action.title), ...(action.id ? { id: action.id } : {}) };
       return { songs: [song, ...store.songs], currentId: song.id };
@@ -146,12 +159,69 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
   }
 }
 
-export function useSongs() {
+/**
+ * `uid` is null signed out. Signed in, `localStorage` is still what the UI
+ * reads and writes through the reducer — nothing here changes that — but a
+ * sign-in pulls the account's remote library down and merges it in
+ * (`mergeOnSignIn`, see songSync.ts for the migration rule), and every local
+ * edit thereafter is mirrored up.
+ */
+export function useSongs(uid: string | null) {
   const [store, dispatch] = useReducer(songsReducer, undefined, loadStore);
 
   useEffect(() => {
     saveStore(store);
   }, [store]);
+
+  /* The push effect below diffs against this to find what an edit touched —
+     see `editSong`, which returns the very same song and array references for
+     anything an action did not touch. Set alongside HYDRATE so the merge
+     itself is never mistaken for a fresh local edit and echoed straight back. */
+  const prevSongs = useRef(store.songs);
+
+  useEffect(() => {
+    if (!uid || !firebaseEnabled) return;
+    let cancelled = false;
+
+    void (async () => {
+      const remote = await fetchRemoteSongs(uid);
+      if (cancelled) return;
+
+      const allowPush = lastSyncedUid() === null || lastSyncedUid() === uid;
+      const { merged, toPush } = mergeOnSignIn(store.songs, remote, allowPush);
+
+      if (toPush.length) await pushSongs(uid, toPush);
+      if (cancelled) return;
+
+      rememberSyncedUid(uid);
+      prevSongs.current = merged;
+      dispatch({ type: 'HYDRATE', songs: merged });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately uid-only: this runs once per sign-in, not on every local
+    // edit — the push effect below is what mirrors those.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
+
+  useEffect(() => {
+    if (!uid || !firebaseEnabled) return;
+    if (prevSongs.current === store.songs) return; // nothing this action touched
+
+    const before = new Map(prevSongs.current.map((s) => [s.id, s] as const));
+    const afterIds = new Set(store.songs.map((s) => s.id));
+
+    for (const song of store.songs) {
+      if (before.get(song.id) !== song) void writeSong(uid, song);
+    }
+    for (const song of prevSongs.current) {
+      if (!afterIds.has(song.id)) void deleteRemoteSong(uid, song.id);
+    }
+
+    prevSongs.current = store.songs;
+  }, [uid, store.songs]);
 
   const current = useMemo(
     () => store.songs.find((s) => s.id === store.currentId) ?? null,

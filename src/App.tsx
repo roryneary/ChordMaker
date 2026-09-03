@@ -6,23 +6,27 @@ import Landing from './screens/Landing';
 import Library from './screens/Library';
 import Ready from './screens/Ready';
 import SongScreen from './screens/SongScreen';
+import SignIn from './screens/SignIn';
 import Splash from './screens/Splash';
 import WordsEditor from './screens/WordsEditor';
 import { type Route, useRoute } from './app/routes';
 import { useSplash } from './app/splash';
 import { named, useSongs } from './hooks/useSongs';
+import { useAuth } from './hooks/useAuth';
 import { findLibraryChord, libraryChordToSpec } from './data/chordLibrary';
 import { newId } from './lib/id';
 import { downloadBlob } from './lib/exportPng';
 import { songFilename, songToPdfBlob } from './lib/exportPdf';
-import { loadUserChords, saveUserChords } from './lib/storage';
+import { useUserChords } from './hooks/useUserChords';
 import { ThemeProvider } from './theme/ThemeProvider';
 import type { ChordSpec } from './types/chord';
 import type { Song } from './types/song';
 
 function Router() {
   const { route, stack, go, replace, back, reset, canGoBack } = useRoute();
-  const { store, songs, current, dispatch } = useSongs();
+  const auth = useAuth();
+  const { store, songs, current, dispatch } = useSongs(auth.account?.uid ?? null);
+  const userChords = useUserChords(auth.account?.uid ?? null);
   const [printing, setPrinting] = useState(false);
   /* A shape taken from the library, waiting for the editor we came from to
      pick it up. Cleared as soon as the editor is finished with. */
@@ -36,6 +40,13 @@ function Router() {
       dispatch({ type: 'OPEN_SONG', id: routedSongId });
     }
   }, [routedSongId, store.currentId, dispatch]);
+
+  /* An account without a handle is a half-finished sign-in: nothing can be
+     shared from it, because a shared song names its sender. So the claim step
+     follows the user until it is done, wherever they landed. */
+  useEffect(() => {
+    if (auth.needsHandle && route.name !== 'signIn') go({ name: 'signIn' });
+  }, [auth.needsHandle, route.name, go]);
 
   const songFor = (id: string | null): Song | null => songs.find((s) => s.id === id) ?? null;
 
@@ -51,8 +62,8 @@ function Router() {
     // Same rule as the songs reducer: nothing nameless gets stored.
     if (!named(spec)) return;
     const trimmed = { ...spec, name: spec.name.trim() };
-    saveUserChords([...loadUserChords(), { id: newId(), spec: trimmed }]);
-  }, []);
+    userChords.add({ id: newId(), spec: trimmed });
+  }, [userChords]);
 
   const startSong = useCallback(() => {
     // The id is minted here rather than in the reducer so we can navigate to
@@ -90,6 +101,17 @@ function Router() {
     switch (route.name) {
       case 'landing':
         return landing;
+
+      case 'signIn':
+        return (
+          <SignIn
+            needsHandle={auth.needsHandle}
+            suggestFrom={auth.user?.displayName ?? auth.user?.email ?? null}
+            onClaim={auth.claimHandle}
+            onDone={back}
+            onCancel={back}
+          />
+        );
 
       case 'library': {
         // Only offer selection when there is an editor underneath to return to.
@@ -216,6 +238,9 @@ function Router() {
 
   return (
     <AppShell
+      account={auth.account}
+      onAccount={() => go({ name: 'signIn' })}
+      onSignOut={auth.signOut}
       route={route}
       previous={stack[stack.length - 2]}
       songs={songs}
