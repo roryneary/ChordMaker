@@ -135,12 +135,14 @@ has something to check back against. What was decided along the way, each asked 
   fields, size limits at four times the longest real song. The rules must now be kept in step
   with `types/song.ts` and `types/playlist.ts` — see the notes on §0's items.
 
-**Not yet checked, and it must be before this is relied on:**
-- **The rules have never run.** There is no Java on this machine, so the Firestore emulator
-  could not start, and nothing was deployed. `firestore.rules` is reviewed by eye only. It
-  replaces the rule every existing save depends on, so a mistake in `validSong` stops *all*
-  songs saving, not just sharing. Deploy with `firebase deploy --only firestore:rules`, then
-  straight away: save an ordinary song and a playlist and watch the sync line; then walk the
+**Deployed 2026-09-20, and still to be checked by hand:**
+- **The rules are live, but they have never been exercised.** `firebase deploy --only
+  firestore:rules` reported the file already matched what was in the project, so this version
+  has been live for some time; it compiled cleanly. That is not the same as having run. There
+  is no Java on this machine, so the Firestore emulator could not start and `firestore.rules`
+  is still reviewed by eye only. It replaces the rule every existing save depends on, so a
+  mistake in `validSong` stops *all* songs saving, not just sharing. Check straight away:
+  save an ordinary song and a playlist and watch the sync line; then walk the
   list in the plan — a write to `users/{me}/anything/x` refused, a signed-out `get` of a shared
   song allowed, any `list` of `shared` refused, a card for someone else's share refused,
   publishing under someone else's handle refused, a version jump of two refused.
