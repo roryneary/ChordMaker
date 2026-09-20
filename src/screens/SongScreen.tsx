@@ -487,12 +487,12 @@ export default function SongScreen({
             </button>
             <button
               type="button"
-              className="btn-secondary"
+              className="btn-primary"
               onClick={onFullScreen}
               disabled={!hasLyric}
             >
               <ArrowsOutSimple size={15} />
-              Full screen
+              Play it
             </button>
           </div>
           {wordsBlock}
@@ -548,25 +548,32 @@ export default function SongScreen({
         <div className="label-row">
           <h2>The words</h2>
           <span>{hasLyric ? 'tap a word to drop a chord' : 'not pasted yet'}</span>
-          <span className="spacer" />
-          <button
-            type="button"
-            className="icon-btn sm"
-            onClick={onFullScreen}
-            aria-label="Full screen"
-            disabled={!hasLyric}
-          >
-            <ArrowsOutSimple size={16} />
-          </button>
         </div>
         {wordsBlock}
         {deleteRow}
       </div>
 
-      <div className="editor-action">
-        <button type="button" className="btn-primary btn-block" onClick={finish}>
-          Looks right
-          <ArrowRight size={16} />
+      {/* Both ways out of the builder, in words. Playing leads, because it is
+          the one you come back for once the song is built; the other is the
+          finishing step you take once. Full screen used to be an unlabelled
+          expand icon halfway up the scroll, with "Looks right" the only thing
+          named down here — so "how do I play this?" had no answer on the
+          screen. With no words pasted there is nothing to read full screen, so
+          the button is not offered rather than offered and refused. */}
+      <div className="editor-action editor-actions">
+        {hasLyric && (
+          <button type="button" className="btn-primary btn-block song-play" onClick={onFullScreen}>
+            <ArrowsOutSimple size={16} />
+            Play it
+          </button>
+        )}
+        <button
+          type="button"
+          className={`${hasLyric ? 'btn-secondary' : 'btn-primary'} btn-block`}
+          onClick={finish}
+        >
+          Share or print
+          {!hasLyric && <ArrowRight size={16} />}
         </button>
       </div>
       {picker}

@@ -4,6 +4,14 @@ import type { Membership } from '../lib/playlists';
 import ChordDiagram from './ChordDiagram';
 import { songSubLine } from '../lib/songSummary';
 
+/**
+ * How many diagrams the preview row renders. The row shows however many fit the
+ * card's width and clips the rest, so this is a ceiling on the work rather than
+ * the number seen: at 44px a slot, more than this cannot fit any card the
+ * layout allows (the list stops at 640px wide, which is eleven slots).
+ */
+const PREVIEW_CHORDS = 16;
+
 interface Props {
   song: Song;
   onOpen: (songId: string) => void;
@@ -74,7 +82,7 @@ export default function SongCard({
         </span>
         {song.chords.length > 0 && (
           <span className="resume-chords">
-            {song.chords.slice(0, 4).map((c) => (
+            {song.chords.slice(0, PREVIEW_CHORDS).map((c) => (
               <ChordDiagram key={c.id} spec={c.spec} width={44} />
             ))}
           </span>

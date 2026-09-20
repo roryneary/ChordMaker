@@ -458,7 +458,20 @@ h1, h2, h3, h4 {
   color: color-mix(in srgb, var(--color-text) 52%, transparent);
 }
 
-.resume-chords { display: flex; gap: 9px; margin-top: 12px; }
+/* One row's worth of shapes, however wide the card is: slots fill the width
+   and whatever starts a second row is clipped. It was a fixed four before,
+   which left a wide card three-quarters empty on a song with more. Nothing is
+   hidden by this — the sub-line above already says how many the song has. */
+.resume-chords {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 44px);
+  grid-template-rows: auto;
+  grid-auto-rows: 0;
+  column-gap: 9px;
+  row-gap: 0;
+  margin-top: 12px;
+  overflow: hidden;
+}
 
 @media (min-width: 1024px) {
   .landing { padding: 40px; }
@@ -1004,6 +1017,11 @@ h1, h2, h3, h4 {
 .editor-keep input { width: 17px; height: 17px; margin: 0; accent-color: var(--color-accent); }
 .editor-keep input:disabled + *, .editor-keep label:has(input:disabled) { opacity: 0.45; cursor: default; }
 .editor-actions .btn-block { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 10px; }
+
+/* The song screen puts "Play it" beside "Share or print" in this same row, and
+   leans it wider: they are not two equal choices, and the wider half is the one
+   you came back to the song to do. */
+.song-play { flex: 1.35 1 0; }
 
 @media (min-width: 1024px) {
   .editor-body { max-width: 620px; padding: 12px 40px 0; }
