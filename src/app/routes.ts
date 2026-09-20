@@ -9,14 +9,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 export type Route =
   | { name: 'landing' }
-  /* A chord always belongs to a song. There used to be a song-less form of
-     this route for "Just one chord"; it saved to a store nothing read. */
+  /* A chord in a song. There used to be a song-less form of this route for
+     "Just one chord"; it saved to a store nothing read. `myChord` below is
+     what that should have been: a chord with no song, kept in a library the
+     Chords tab shows. */
   | { name: 'chordEditor'; songId: string; chordId: string | null }
   | { name: 'words'; songId: string }
   | { name: 'song'; songId: string }
   | { name: 'fullScreen'; songId: string }
   | { name: 'ready'; songId: string }
   | { name: 'library' }
+  /** One of My chords in the editor: a new one, or one already kept. */
+  | { name: 'myChord'; chordId: string | null }
   /** Every song. Plural, and nothing to do with `song` below it. */
   | { name: 'songs' }
   /** Every playlist, then one of them, then the step that adds songs to it. */
@@ -37,6 +41,10 @@ export function toHash(route: Route): string {
       return '#/';
     case 'library':
       return '#/library';
+    // Under the library, where it lives. Not `#/chords/...`: that is one letter
+    // from `#/chord/new`, which is the retired song-less editor and goes home.
+    case 'myChord':
+      return `#/library/chord/${route.chordId ?? 'new'}`;
     case 'songs':
       return '#/songs';
     case 'playlists':
@@ -68,6 +76,9 @@ export function fromHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
   if (!parts.length) return LANDING;
 
+  if (parts[0] === 'library' && parts[1] === 'chord' && parts[2]) {
+    return { name: 'myChord', chordId: parts[2] === 'new' ? null : parts[2] };
+  }
   if (parts[0] === 'library') return { name: 'library' };
   if (parts[0] === 'songs') return { name: 'songs' };
   if (parts[0] === 'playlists') return { name: 'playlists' };
@@ -109,6 +120,25 @@ export function replaceTop(stack: Route[], next: Route): Route[] {
   const under = stack[stack.length - 2];
   if (under && sameRoute(under, next)) return stack.slice(0, -1);
   return [...stack.slice(0, -1), next];
+}
+
+/**
+ * The song we are inside, or null once we have walked out of it. Not just "the
+ * route's songId": the chord library opened from the editor, and the sign-in
+ * opened from sharing, are steps taken from within a song and name none — so
+ * those are looked through to whatever they were opened from.
+ *
+ * `myChord` is looked through as well. It is only offered from the Chords tab,
+ * which is not inside a song; but the answer here decides whether a blank song
+ * is thrown away, so it does not rest on that staying true.
+ */
+export function openSongId(stack: readonly Route[]): string | null {
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const route = stack[i];
+    if (route.name === 'library' || route.name === 'signIn' || route.name === 'myChord') continue;
+    return 'songId' in route ? route.songId : null;
+  }
+  return null;
 }
 
 export function useRoute() {

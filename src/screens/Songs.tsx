@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { UsersThree } from '@phosphor-icons/react';
+import { Plus, UsersThree } from '@phosphor-icons/react';
 import SongCard from '../components/SongCard';
 import AddToPlaylistSheet from '../components/AddToPlaylistSheet';
 import DeleteSongSheet from '../components/DeleteSongSheet';
@@ -16,8 +16,8 @@ interface Props {
   onOpenPlaylist: (membership: Membership) => void;
   onAddToPlaylist: (playlistId: string, songId: string) => void;
   onCreatePlaylist: (name: string, songId: string) => void;
-  onNewSong: () => void;
-  onJustChords: () => void;
+  /** A new song, from here as from the home screen. */
+  onStart: () => void;
   /** To the songs other people have shared. Here, not in the tab bar: that is full. */
   onFindShared: () => void;
   /** The sender's newer version of a song taken from them, if there is one. */
@@ -55,8 +55,7 @@ export default function Songs({
   onOpenPlaylist,
   onAddToPlaylist,
   onCreatePlaylist,
-  onNewSong,
-  onJustChords,
+  onStart,
   onFindShared,
   updateFor,
   sharingFor,
@@ -103,7 +102,18 @@ export default function Songs({
 
   return (
     <div className="songs">
-      <h1 className="display-sm">Songs</h1>
+      {/* Always here, not only on an empty list: the tab bar has no "Start",
+          so without it a phone with one song could only start a second from
+          the home screen. */}
+      <div className="songs-head">
+        <h1 className="display-sm">Songs</h1>
+        {n > 0 && (
+          <button type="button" className="btn-primary songs-new" onClick={onStart}>
+            <Plus size={14} weight="bold" />
+            New song
+          </button>
+        )}
+      </div>
       <p className="library-sub">
         {n === 0
           ? 'Every song you make is kept here, on this device. No signal needed.'
@@ -117,11 +127,8 @@ export default function Songs({
       {n === 0 ? (
         <div className="songs-empty">
           <p>No songs yet.</p>
-          <button type="button" className="btn-primary btn-block" onClick={onJustChords}>
-            Start with just the chords
-          </button>
-          <button type="button" className="btn-secondary btn-block" onClick={onNewSong}>
-            Start with the words
+          <button type="button" className="btn-primary btn-block" onClick={onStart}>
+            Start a song
           </button>
         </div>
       ) : (

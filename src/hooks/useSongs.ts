@@ -2,11 +2,22 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import type { ChordSpec } from '../types/chord';
 import type { SavedChord, Song } from '../types/song';
 import type { Playlist } from '../types/playlist';
+import type { MyChord } from '../types/myChord';
 import type { SharedSong } from '../types/sharedSong';
 import { lineageOf } from '../lib/sharedSong';
+import { isBlankSong } from '../lib/songSummary';
+import { chordChanged } from '../lib/chordEdits';
+import { cleanChordName, collapseByShape, keepOffer, newMyChord } from '../lib/myChords';
 import { newId } from '../lib/id';
 import { prunePlacements, pruneToChords, retokenise } from '../lib/lyric';
-import { type SongStore, loadStore, newSong, parseSong, saveStore } from '../lib/storage';
+import {
+  type SongStore,
+  loadStore,
+  newSong,
+  parseMyChord,
+  parseSong,
+  saveStore,
+} from '../lib/storage';
 import { firebaseEnabled } from '../lib/firebase';
 import { deleteRemoteSong, fetchRemoteSongs, writeSong } from '../lib/songSync';
 import {
@@ -14,6 +25,7 @@ import {
   fetchRemotePlaylists,
   writePlaylist,
 } from '../lib/playlistSync';
+import { deleteRemoteMyChord, fetchRemoteMyChords, writeMyChord } from '../lib/chordSync';
 import {
   cleanPlaylistName,
   moveItem,
@@ -51,13 +63,25 @@ export type SongsAction =
       /** Absent leaves the playlists alone; the hook always sends them. */
       remotePlaylists?: Playlist[];
       restoredPlaylists?: Playlist[];
+      /** The same again for My chords. */
+      remoteChords?: MyChord[];
+      restoredChords?: MyChord[];
     }
   /** The account confirmed a write (`updatedAt`) or a delete (`null`). */
   | { type: 'SYNCED'; id: string; updatedAt: number | null }
   | { type: 'PLAYLIST_SYNCED'; id: string; updatedAt: number | null }
+  | { type: 'MY_CHORD_SYNCED'; id: string; updatedAt: number | null }
+  /* My chords. None of these touches a song, and no song action touches them:
+     a song holds its own copy of every shape it uses. */
+  /** Keeps a shape. Nothing happens if it cannot be kept: see `keepOffer`. */
+  | { type: 'KEEP_CHORD'; spec: ChordSpec; id?: string }
+  | { type: 'UPDATE_MY_CHORD'; id: string; spec: ChordSpec }
+  | { type: 'DELETE_MY_CHORD'; id: string }
   | { type: 'CREATE_SONG'; title: string; id?: string }
   | { type: 'OPEN_SONG'; id: string | null }
   | { type: 'DELETE_SONG'; id: string }
+  /** The song has been walked away from. Deletes it if there is nothing in it. */
+  | { type: 'DISCARD_IF_BLANK'; id: string }
   | { type: 'SET_TITLE'; id: string; title: string }
   | { type: 'SET_META'; id: string; key?: string; feel?: string }
   | { type: 'SET_CAPO'; id: string; capo: number | null }
@@ -155,6 +179,82 @@ function editPlaylist(
     : store;
 }
 
+type Hydrate = Extract<SongsAction, { type: 'HYDRATE' }>;
+
+/** The playlists' half of a sign-in. Nothing, if the account sent none to merge. */
+function hydratePlaylists(store: SongStore, action: Hydrate): Partial<SongStore> {
+  // They take the same merge as songs, by the same rule. They keep the order
+  // they are in rather than sorting by stamp: reordering a set should not also
+  // shuffle the list of sets.
+  if (!action.remotePlaylists) return {};
+  const lists = mergeOnSignIn(
+    store.playlists,
+    action.remotePlaylists,
+    action.allowPush,
+    store.unsyncedPlaylists,
+  );
+  const haveList = new Set(lists.merged.map((p) => p.id));
+  const restoredLists = (action.restoredPlaylists ?? []).filter((p) => !haveList.has(p.id));
+  const order = new Map(store.playlists.map((p, i) => [p.id, i] as const));
+  const last = Number.MAX_SAFE_INTEGER;
+  const playlists = [...lists.merged, ...restoredLists].sort(
+    (a, b) => (order.get(a.id) ?? last) - (order.get(b.id) ?? last) || a.createdAt - b.createdAt,
+  );
+  return {
+    playlists,
+    unsyncedPlaylists: [
+      ...lists.toPush.map((p) => p.id),
+      ...lists.toDelete,
+      ...restoredLists.map((p) => p.id),
+    ],
+  };
+}
+
+/**
+ * My chords' half. The same merge, and then one step the others do not need.
+ * Accounts merge by id, and My chords is one entry per *shape*: the same shape
+ * kept on a phone and on a laptop arrives here as two. `collapseByShape` keeps
+ * the older, and the other is listed as unconfirmed with nothing behind it,
+ * which is how a delete is spelled. Both devices pick the same winner, so they
+ * end up agreeing rather than deleting each other's.
+ */
+function hydrateChords(store: SongStore, action: Hydrate): Partial<SongStore> {
+  if (!action.remoteChords) return {};
+  const mine = mergeOnSignIn(
+    store.chords,
+    action.remoteChords,
+    action.allowPush,
+    store.unsyncedChords,
+  );
+  const have = new Set(mine.merged.map((c) => c.id));
+  const restored = (action.restoredChords ?? []).filter((c) => !have.has(c.id));
+  const { kept, dropped } = collapseByShape([...mine.merged, ...restored]);
+  const held = new Set(kept.map((c) => c.id));
+  const toSend = [...mine.toPush, ...restored].map((c) => c.id).filter((id) => held.has(id));
+  return {
+    // Newest first: there is no order of the player's own to keep.
+    chords: [...kept].sort((a, b) => b.createdAt - a.createdAt),
+    unsyncedChords: [...new Set([...toSend, ...mine.toDelete, ...dropped])],
+  };
+}
+
+/** `editPlaylist`, for one of My chords. */
+function editMyChord(
+  store: SongStore,
+  id: string,
+  change: (chord: MyChord) => MyChord,
+): SongStore {
+  let touched = false;
+  const chords = store.chords.map((c) => {
+    if (c.id !== id) return c;
+    const next = change(c);
+    if (next === c) return c;
+    touched = true;
+    return { ...next, updatedAt: Math.max(Date.now(), c.updatedAt + 1) };
+  });
+  return touched ? { ...store, chords, unsyncedChords: mark(store.unsyncedChords, id) } : store;
+}
+
 export function songsReducer(store: SongStore, action: SongsAction): SongStore {
   switch (action.type) {
     case 'HYDRATE': {
@@ -170,7 +270,7 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
       const restored = (action.restored ?? []).filter((s) => !have.has(s.id));
 
       // Newest first. The account hands songs back in document-id order, which
-      // is no order at all, and "pick up where you left off" reads songs[0].
+      // is no order at all, and the Songs screen lists them as they are held.
       const songs = [...merged, ...restored].sort((a, b) => b.updatedAt - a.updatedAt);
 
       // Keeps the open song open if the merge still has it; falls back rather
@@ -183,34 +283,57 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
       // either confirmed by the fetch or belongs to a library now set aside.
       const unsynced = [...toPush.map((s) => s.id), ...toDelete, ...restored.map((s) => s.id)];
 
-      // Playlists take the same merge, by the same rule. They keep the order
-      // they are in rather than sorting by stamp: reordering a set should not
-      // also shuffle the list of sets.
-      if (!action.remotePlaylists) return { ...store, songs, currentId, unsynced };
-      const lists = mergeOnSignIn(
-        store.playlists,
-        action.remotePlaylists,
-        action.allowPush,
-        store.unsyncedPlaylists,
-      );
-      const haveList = new Set(lists.merged.map((p) => p.id));
-      const restoredLists = (action.restoredPlaylists ?? []).filter((p) => !haveList.has(p.id));
-      const order = new Map(store.playlists.map((p, i) => [p.id, i] as const));
-      const last = Number.MAX_SAFE_INTEGER;
-      const playlists = [...lists.merged, ...restoredLists].sort(
-        (a, b) =>
-          (order.get(a.id) ?? last) - (order.get(b.id) ?? last) || a.createdAt - b.createdAt,
-      );
+      // Each of the other two collections is merged only if the account sent
+      // it, and is otherwise left exactly as it was.
       return {
+        ...store,
         songs,
         currentId,
         unsynced,
-        playlists,
-        unsyncedPlaylists: [
-          ...lists.toPush.map((p) => p.id),
-          ...lists.toDelete,
-          ...restoredLists.map((p) => p.id),
-        ],
+        ...hydratePlaylists(store, action),
+        ...hydrateChords(store, action),
+      };
+    }
+
+    case 'MY_CHORD_SYNCED': {
+      if (!store.unsyncedChords.includes(action.id)) return store;
+      const chord = store.chords.find((c) => c.id === action.id);
+      // Edited again while that write was in flight: still unconfirmed.
+      if ((chord?.updatedAt ?? null) !== action.updatedAt) return store;
+      return { ...store, unsyncedChords: store.unsyncedChords.filter((id) => id !== action.id) };
+    }
+
+    case 'KEEP_CHORD': {
+      /* One entry per shape, and never one of the built-in shapes again: the
+         rule is here, so no way of keeping a chord can get round it. The
+         screens ask `keepOffer` first and say why; this is the backstop. */
+      if (!named(action.spec) || keepOffer(store.chords, action.spec) !== 'offer') return store;
+      const chord = newMyChord(action.spec, action.id);
+      return {
+        ...store,
+        chords: [chord, ...store.chords],
+        unsyncedChords: mark(store.unsyncedChords, chord.id),
+      };
+    }
+
+    case 'UPDATE_MY_CHORD': {
+      // Renaming is always fine. Reshaping it into a built-in, or into another
+      // entry, would break the rule `KEEP_CHORD` keeps, so it is refused.
+      if (!named(action.spec)) return store;
+      if (keepOffer(store.chords, action.spec, action.id) !== 'offer') return store;
+      const spec = { ...action.spec, name: cleanChordName(action.spec.name) };
+      return editMyChord(store, action.id, (c) =>
+        chordChanged(spec, c.spec) ? { ...c, spec } : c,
+      );
+    }
+
+    case 'DELETE_MY_CHORD': {
+      if (!store.chords.some((c) => c.id === action.id)) return store;
+      // Songs that use the shape hold their own copy of it, and keep it.
+      return {
+        ...store,
+        chords: store.chords.filter((c) => c.id !== action.id),
+        unsyncedChords: mark(store.unsyncedChords, action.id),
       };
     }
 
@@ -265,6 +388,17 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
       return { ...swept, songs, currentId, unsynced: mark(store.unsynced, action.id) };
     }
 
+    case 'DISCARD_IF_BLANK': {
+      /* A start card makes its song on the tap, so tapping one to see what it
+         does and backing out would leave an "Untitled" with nothing in it. Not
+         a shared one — its shared copy is a separate document this cannot
+         remove — and not one somebody has put in a playlist, blank or not. */
+      const song = store.songs.find((s) => s.id === action.id);
+      if (!song || !isBlankSong(song) || song.shared) return store;
+      if (store.playlists.some((p) => p.items.some((i) => i.songId === song.id))) return store;
+      return songsReducer(store, { type: 'DELETE_SONG', id: song.id });
+    }
+
     case 'SET_TITLE':
       return editSong(store, action.id, (s) => ({ ...s, title: action.title }));
 
@@ -304,10 +438,18 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
     case 'UPDATE_CHORD': {
       if (!named(action.spec)) return store;
       const spec = trimName(action.spec);
-      return editSong(store, action.id, (s) => ({
-        ...s,
-        chords: s.chords.map((c) => (c.id === action.chordId ? { ...c, spec } : c)),
-      }));
+      return editSong(store, action.id, (s) => {
+        /* Saved as it was is no edit. It matters now that a chord is opened
+           just to tick "Keep in My chords": a new song object would move
+           `updatedAt`, send the song up again, and tell everyone holding a
+           copy of a shared one that it had changed. */
+        const held = s.chords.find((c) => c.id === action.chordId);
+        if (!held || !chordChanged(spec, held.spec)) return s;
+        return {
+          ...s,
+          chords: s.chords.map((c) => (c.id === action.chordId ? { ...c, spec } : c)),
+        };
+      });
     }
 
     case 'REMOVE_CHORD':
@@ -547,9 +689,10 @@ export function useSongs(uid: string | null) {
     syncDispatch({ type: 'hydrateStarted', uid });
     void (async () => {
       try {
-        const [remote, remotePlaylists] = await Promise.all([
+        const [remote, remotePlaylists, remoteChords] = await Promise.all([
           fetchRemoteSongs(uid),
           fetchRemotePlaylists(uid),
+          fetchRemoteMyChords(uid),
         ]);
         if (cancelled) return;
 
@@ -565,6 +708,11 @@ export function useSongs(uid: string | null) {
             mergeOnSignIn(here.playlists, remotePlaylists, false).stranded,
             'playlists',
           );
+          stashLibrary(
+            previous,
+            mergeOnSignIn(here.chords, remoteChords, false).stranded,
+            'chords',
+          );
         }
         const restored = takeStash(uid)
           .map(parseSong)
@@ -572,6 +720,9 @@ export function useSongs(uid: string | null) {
         const restoredPlaylists = takeStash(uid, 'playlists')
           .map(parsePlaylist)
           .filter((p): p is Playlist => p !== null);
+        const restoredChords = takeStash(uid, 'chords')
+          .map(parseMyChord)
+          .filter((c): c is MyChord => c !== null);
 
         rememberSyncedUid(uid);
         dispatch({
@@ -581,6 +732,8 @@ export function useSongs(uid: string | null) {
           restored,
           remotePlaylists,
           restoredPlaylists,
+          remoteChords,
+          restoredChords,
         });
         syncDispatch({ type: 'hydrateSucceeded', uid });
       } catch (err) {
@@ -605,9 +758,9 @@ export function useSongs(uid: string | null) {
     if (!account || !hydrated) return;
     const uid = account;
 
-    /* One piece of work per unconfirmed id, songs and playlists alike. `key`
-       is what `inflight` and `failed` file it under — prefixed for a playlist
-       so the two kinds cannot be mistaken for each other there. */
+    /* One piece of work per unconfirmed id, whichever collection it is in.
+       `key` is what `inflight` and `failed` file it under — prefixed for a
+       playlist or a chord so the kinds cannot be mistaken for each other. */
     interface Job {
       key: string;
       stamp: number | null;
@@ -617,6 +770,7 @@ export function useSongs(uid: string | null) {
     }
     const songs = new Map(store.songs.map((s) => [s.id, s] as const));
     const playlists = new Map(store.playlists.map((p) => [p.id, p] as const));
+    const chords = new Map(store.chords.map((c) => [c.id, c] as const));
     const jobs: Job[] = [
       ...store.unsynced.map((id): Job => {
         const song = songs.get(id);
@@ -638,6 +792,17 @@ export function useSongs(uid: string | null) {
           label: playlist?.name ?? id,
           send: () => (playlist ? writePlaylist(uid, playlist) : deleteRemotePlaylist(uid, id)),
           confirm: () => dispatch({ type: 'PLAYLIST_SYNCED', id, updatedAt: stamp }),
+        };
+      }),
+      ...store.unsyncedChords.map((id): Job => {
+        const chord = chords.get(id);
+        const stamp = chord?.updatedAt ?? null;
+        return {
+          key: `chord:${id}`,
+          stamp,
+          label: chord?.spec.name ?? id,
+          send: () => (chord ? writeMyChord(uid, chord) : deleteRemoteMyChord(uid, id)),
+          confirm: () => dispatch({ type: 'MY_CHORD_SYNCED', id, updatedAt: stamp }),
         };
       }),
     ];
@@ -681,6 +846,8 @@ export function useSongs(uid: string | null) {
     store.unsynced,
     store.playlists,
     store.unsyncedPlaylists,
+    store.chords,
+    store.unsyncedChords,
     attempt,
   ]);
 
@@ -695,7 +862,8 @@ export function useSongs(uid: string | null) {
     [store],
   );
 
-  const unsyncedCount = store.unsynced.length + store.unsyncedPlaylists.length;
+  const unsyncedCount =
+    store.unsynced.length + store.unsyncedPlaylists.length + store.unsyncedChords.length;
   const syncView = useMemo<SyncView>(() => {
     const phase = syncPhase(sync, unsyncedCount);
     return {
@@ -710,6 +878,7 @@ export function useSongs(uid: string | null) {
     store,
     songs: store.songs,
     playlists: store.playlists,
+    myChords: store.chords,
     current,
     dispatch,
     sync: syncView,

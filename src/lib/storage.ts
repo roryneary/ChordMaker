@@ -1,6 +1,7 @@
 import type { ChordSpec } from '../types/chord';
 import type { CopiedFrom, Placements, SavedChord, SharedRef, Song, Word } from '../types/song';
 import type { Playlist } from '../types/playlist';
+import type { MyChord } from '../types/myChord';
 import { newId } from './id';
 import { clampRootFret } from './layout';
 import { parsePlaylist } from './playlists';
@@ -52,6 +53,16 @@ export interface SongStore {
   /** `unsynced`, for playlists. Separate because an id with nothing behind it
       means "deleted", and the sync has to know from which collection. */
   unsyncedPlaylists: string[];
+  /**
+   * "My chords": shapes kept outside any song. Here for the playlists' other
+   * reason — one store is one save, one merge at sign-in and one line saying
+   * whether it is all kept — not because anything ties them to a song. Nothing
+   * does: a song holds its own copy of every shape it uses, so no action on a
+   * song touches these, and none on these touches a song.
+   */
+  chords: MyChord[];
+  /** `unsynced`, for My chords. */
+  unsyncedChords: string[];
 }
 
 interface StoredV2 {
@@ -64,6 +75,9 @@ interface StoredV2 {
       No version bump — the `capo` precedent, an absent key that already means something. */
   playlists?: Playlist[];
   unsyncedPlaylists?: string[];
+  /** The same again for My chords: absent is "none kept, nothing to confirm". */
+  chords?: MyChord[];
+  unsyncedChords?: string[];
 }
 
 export const emptyStore = (): SongStore => ({
@@ -72,6 +86,8 @@ export const emptyStore = (): SongStore => ({
   unsynced: [],
   playlists: [],
   unsyncedPlaylists: [],
+  chords: [],
+  unsyncedChords: [],
 });
 
 export function newSong(title = ''): Song {
@@ -125,6 +141,23 @@ const withValidRootFret = (c: SavedChord): SavedChord => {
 /** A single chord from an untrusted source — the sibling of `parseSong`. */
 export function parseSavedChord(x: unknown): SavedChord | null {
   return isSavedChord(x) ? withValidRootFret(x) : null;
+}
+
+/**
+ * One of My chords from an untrusted source — and, unlike `parseSong` and
+ * `parsePlaylist`, it does NOT forgive a missing stamp. That is deliberate, so
+ * leave it strict: the retired loose-chord store wrote bare `{ id, spec }`
+ * documents to the very path My chords now syncs to, and those shapes were
+ * already folded into a "Loose chords" song. The stamps are how the two are
+ * told apart; default them and every one of those comes back as a duplicate.
+ */
+export function parseMyChord(x: unknown): MyChord | null {
+  const chord = parseSavedChord(x);
+  const raw = x as Partial<MyChord> | null;
+  if (!chord || typeof raw?.createdAt !== 'number' || typeof raw.updatedAt !== 'number') {
+    return null;
+  }
+  return { id: chord.id, spec: chord.spec, createdAt: raw.createdAt, updatedAt: raw.updatedAt };
 }
 
 const parseSavedChords = (x: unknown): SavedChord[] =>
@@ -223,6 +256,8 @@ export function serializeStore(store: SongStore): string {
     unsynced: store.unsynced,
     playlists: store.playlists,
     unsyncedPlaylists: store.unsyncedPlaylists,
+    chords: store.chords,
+    unsyncedChords: store.unsyncedChords,
   };
   return JSON.stringify(stored);
 }
@@ -242,12 +277,17 @@ export function parseStore(raw: string | null): SongStore | null {
     const playlists = Array.isArray(data.playlists)
       ? data.playlists.map(parsePlaylist).filter((p): p is Playlist => p !== null)
       : [];
+    const chords = Array.isArray(data.chords)
+      ? data.chords.map(parseMyChord).filter((c): c is MyChord => c !== null)
+      : [];
     return {
       songs,
       currentId,
       unsynced: ids(data.unsynced),
       playlists,
       unsyncedPlaylists: ids(data.unsyncedPlaylists),
+      chords,
+      unsyncedChords: ids(data.unsyncedChords),
     };
   } catch {
     return null;

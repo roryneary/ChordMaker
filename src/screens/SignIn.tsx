@@ -126,7 +126,7 @@ export default function SignIn({
      it forgot who you were. */
   if (account?.handle) {
     return (
-      <div className="signin">
+      <div className="signin signin-account">
         <button type="button" className="icon-btn" onClick={onCancel} aria-label="Back">
           <ArrowLeft size={20} />
         </button>

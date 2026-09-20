@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppShell, { libraryIsStep } from './components/shell/AppShell';
 import ChordEditor from './screens/ChordEditor';
 import FullScreen from './screens/FullScreen';
@@ -15,18 +15,20 @@ import SignIn from './screens/SignIn';
 import Songs from './screens/Songs';
 import Splash from './screens/Splash';
 import WordsEditor from './screens/WordsEditor';
-import { type Route, useRoute } from './app/routes';
+import { type Route, openSongId, useRoute } from './app/routes';
 import { useSplash } from './app/splash';
 import { useSongs } from './hooks/useSongs';
+import { useRecent } from './hooks/useRecent';
 import { useAuth } from './hooks/useAuth';
 import { useSharing } from './hooks/useSharing';
 import { useSharedUpdates } from './hooks/useSharedUpdates';
 import { membershipBySong } from './lib/playlists';
+import { recentSongs } from './lib/recent';
+import { firebaseEnabled } from './lib/firebase';
 import { songFromShare } from './lib/sharedSong';
 import type { SharedSong } from './types/sharedSong';
-import { findLibraryChord, libraryChordToSpec } from './data/chordLibrary';
 import { newId } from './lib/id';
-import { downloadBlob } from './lib/exportPng';
+import { chordFilename, chordToPngBlob, downloadBlob } from './lib/exportPng';
 import { songFilename, songToPdfBlob } from './lib/exportPdf';
 import { chordSheetFilename, songChordsToPngBlob } from './lib/exportChordSheet';
 import { type ExportJob, copyPng, shareFile } from './lib/share';
@@ -34,10 +36,13 @@ import { ThemeProvider } from './theme/ThemeProvider';
 import type { ChordSpec } from './types/chord';
 import type { Song } from './types/song';
 
+/** How many recent songs the home screen offers, and the sidebar under its nav. */
+const RECENT_SHOWN = 4;
+
 function Router() {
   const { route, stack, go, replace, back, canGoBack } = useRoute();
   const auth = useAuth();
-  const { store, songs, playlists, current, dispatch, sync } = useSongs(
+  const { store, songs, playlists, myChords, current, dispatch, sync } = useSongs(
     auth.account?.uid ?? null,
   );
   const { sharingFor } = useSharing(auth.account, dispatch);
@@ -51,6 +56,13 @@ function Router() {
   /* A shape taken from the library, waiting for the editor we came from to
      pick it up. Cleared as soon as the editor is finished with. */
   const [picked, setPicked] = useState<ChordSpec | null>(null);
+  /* Both editors clear it on the way out by their own buttons, but the sidebar
+     is a way out too, and a shape left waiting would turn up in the next chord
+     opened — in either editor, now there are two. */
+  const pickInPlay =
+    route.name === 'chordEditor' || route.name === 'myChord' || route.name === 'library';
+  // Reset while rendering rather than in an effect: nothing draws the stale one.
+  if (!pickInPlay && picked) setPicked(null);
 
   // The route names the song; the store's currentId has to follow it, or the
   // sidebar would highlight one song while the pane shows another.
@@ -60,6 +72,14 @@ function Router() {
       dispatch({ type: 'OPEN_SONG', id: routedSongId });
     }
   }, [routedSongId, store.currentId, dispatch]);
+
+  /* Opening a song, to write it or to play it, is what makes it recent. Kept
+     beside the store rather than in the song: see `lib/recent.ts`. */
+  const { recent, opened } = useRecent();
+  useEffect(() => {
+    if (routedSongId) opened(routedSongId);
+  }, [routedSongId, opened]);
+  const recentlyOpened = useMemo(() => recentSongs(songs, recent, RECENT_SHOWN), [songs, recent]);
 
   /* An account without a handle is a half-finished sign-in: nothing can be
      shared from it, because a shared song names its sender. So the claim step
@@ -80,6 +100,16 @@ function Router() {
     if (!songs.some((s) => s.id === leavingId)) replace({ name: 'songs' });
   }, [leavingId, songs, routedSongId, replace]);
 
+  /* Walking out of a song that still has nothing in it throws it away — the
+     rule is the reducer's (DISCARD_IF_BLANK); this only says when. */
+  const openId = openSongId(stack);
+  const wasOpen = useRef<string | null>(null);
+  useEffect(() => {
+    const left = wasOpen.current;
+    wasOpen.current = openId;
+    if (left && left !== openId) dispatch({ type: 'DISCARD_IF_BLANK', id: left });
+  }, [openId, dispatch]);
+
   const songFor = (id: string | null): Song | null => songs.find((s) => s.id === id) ?? null;
 
   /** Chord names live on the chord, so a placement only carries its id. */
@@ -89,21 +119,17 @@ function Router() {
     [],
   );
 
+  /**
+   * The one way to start. It lands on the song screen, not the words editor:
+   * that screen focuses the title of a song with nothing in it and offers both
+   * halves — the add-chord tile and "Paste the words in" — so it serves the
+   * player with the words in hand and the one whose tutor is calling out
+   * chords, without asking either to say which they are first. There were two
+   * ways in, differing only in which screen came next.
+   */
   const startSong = useCallback(() => {
     // The id is minted here rather than in the reducer so we can navigate to
     // the song we just created.
-    const id = newId();
-    dispatch({ type: 'CREATE_SONG', title: '', id });
-    go({ name: 'words', songId: id });
-  }, [dispatch, go]);
-
-  /**
-   * "Just the chords": the name, the capo and the shapes, as fast as a tutor
-   * can call them out. It is a song from the first tap — there is no loose
-   * chord to convert later — so it skips the words and lands on the song
-   * screen, where those three things are. The words can wait.
-   */
-  const startChordsOnly = useCallback(() => {
     const id = newId();
     dispatch({ type: 'CREATE_SONG', title: '', id });
     go({ name: 'song', songId: id });
@@ -161,6 +187,30 @@ function Router() {
     [run],
   );
 
+  /* The same three, for one shape: what the Chords tab offers on a chord. */
+  const saveChordImage = useCallback(
+    (spec: ChordSpec) =>
+      run('image', async () => {
+        downloadBlob(await chordToPngBlob(spec), chordFilename(spec.name));
+      }),
+    [run],
+  );
+  const shareChord = useCallback(
+    (spec: ChordSpec) =>
+      run('share', async () => {
+        const blob = await chordToPngBlob(spec);
+        const file = new File([blob], chordFilename(spec.name), { type: 'image/png' });
+        const outcome = await shareFile(file, spec.name.trim() || 'Chord');
+        if (outcome === 'unsupported') downloadBlob(blob, file.name);
+      }),
+    [run],
+  );
+  const copyChord = useCallback(
+    // The promise, not the picture — see copyPng for why that matters to Safari.
+    (spec: ChordSpec) => run('copy', () => copyPng(chordToPngBlob(spec))),
+    [run],
+  );
+
   const copyChords = useCallback(
     // The promise, not the picture — see copyPng for why that matters to Safari.
     (song: Song) => run('copy', () => copyPng(songChordsToPngBlob(song))),
@@ -169,10 +219,14 @@ function Router() {
 
   const landing = (
     <Landing
-      songs={songs}
-      onNewSong={startSong}
-      onJustChords={startChordsOnly}
+      recent={recentlyOpened}
+      songCount={songs.length}
+      onStart={startSong}
       onResume={(songId) => go({ name: 'song', songId })}
+      onAllSongs={() => go({ name: 'songs' })}
+      onFindShared={() => go({ name: 'shared' })}
+      /* Offered to someone with no songs here, who may have plenty elsewhere. */
+      onSignIn={firebaseEnabled && !auth.user ? () => go({ name: 'signIn' }) : undefined}
     />
   );
 
@@ -196,6 +250,47 @@ function Router() {
     />
   );
 
+  /* Also what a `myChord` route falls back to, as `allPlaylists` is for a
+     playlist's: the chord was deleted, or the link names one never kept here. */
+  const library = () => {
+    // A step when there is an editor underneath to hand a shape back to;
+    // otherwise a place, where chords are made, opened and sent. That includes
+    // the desktop sidebar's way in from a song screen: only an editor
+    // underneath withholds it, since that would be one editor on another.
+    const from = stack[stack.length - 2];
+    const forEditor = from?.name === 'chordEditor' || from?.name === 'myChord';
+    return (
+      <Library
+        mine={myChords}
+        /* Back belongs to the library-as-step. Reached from the Chords tab
+           it is a destination, the tab bar is the way out, and a Back
+           button there only ever lands you on the home page. */
+        onBack={libraryIsStep(from) && canGoBack ? back : undefined}
+        onPick={
+          forEditor
+            ? (spec) => {
+                setPicked(spec);
+                back();
+              }
+            : undefined
+        }
+        place={
+          forEditor
+            ? undefined
+            : {
+                onMake: () => go({ name: 'myChord', chordId: null }),
+                onEditMine: (chordId) => go({ name: 'myChord', chordId }),
+                onDeleteMine: (chordId) => dispatch({ type: 'DELETE_MY_CHORD', id: chordId }),
+                busy,
+                onShare: shareChord,
+                onSaveImage: saveChordImage,
+                onCopy: copyChord,
+              }
+        }
+      />
+    );
+  };
+
   const screen = () => {
     switch (route.name) {
       case 'landing':
@@ -217,8 +312,7 @@ function Router() {
             onCreatePlaylist={(name, songId) =>
               dispatch({ type: 'CREATE_PLAYLIST', name, songIds: [songId] })
             }
-            onNewSong={startSong}
-            onJustChords={startChordsOnly}
+            onStart={startSong}
             onFindShared={() => go({ name: 'shared' })}
             updateFor={updateFor}
             sharingFor={sharingFor}
@@ -292,25 +386,33 @@ function Router() {
           />
         );
 
-      case 'library': {
-        // Only offer selection when there is an editor underneath to return to.
-        const from = stack[stack.length - 2];
-        const forEditor = from?.name === 'chordEditor';
+      case 'library':
+        return library();
+
+      case 'myChord': {
+        const editing = myChords.find((c) => c.id === route.chordId) ?? null;
+        // Deleted, or a link to one this device has never had.
+        if (route.chordId && !editing) return library();
+        const toLibrary = () => {
+          setPicked(null);
+          // `replace`, which pops onto the library underneath when there is one.
+          replace({ name: 'library' });
+        };
         return (
-          <Library
-            /* Back belongs to the library-as-step. Reached from the Chords tab
-               it is a destination, the tab bar is the way out, and a Back
-               button there only ever lands you on the home page. */
-            onBack={libraryIsStep(from) && canGoBack ? back : undefined}
-            onPick={
-              forEditor
-                ? (name) => {
-                    const chord = findLibraryChord(name);
-                    if (chord) setPicked(libraryChordToSpec(chord));
-                    back();
-                  }
-                : undefined
-            }
+          <ChordEditor
+            key={`mine:${route.chordId ?? 'new'}`}
+            where={editing ? 'One of my chords' : 'A chord of your own'}
+            initial={picked ?? editing?.spec ?? null}
+            saved={editing?.spec ?? null}
+            mine={myChords}
+            target={{ kind: 'mine', id: editing?.id ?? null }}
+            onBrowseAll={() => go({ name: 'library' })}
+            onCancel={toLibrary}
+            onSave={(spec) => {
+              if (editing) dispatch({ type: 'UPDATE_MY_CHORD', id: editing.id, spec });
+              else dispatch({ type: 'KEEP_CHORD', spec });
+              toLibrary();
+            }}
           />
         );
       }
@@ -319,24 +421,34 @@ function Router() {
         const song = songFor(route.songId);
         if (!song) return landing;
         const editing = song.chords.find((c) => c.id === route.chordId) ?? null;
+        const title = song.title.trim();
+        const adding = title ? `Adding to ${title}` : 'Adding a chord';
         return (
           <ChordEditor
-            songTitle={song.title.trim() || null}
+            /* Keyed, as the one above is: both sit at the same place in the
+               tree, and a hop between them by hash would carry one chord's
+               typed name into the other. */
+            key={`song:${song.id}:${route.chordId ?? 'new'}`}
+            where={song.chords.length > 0 ? `${adding} · ${song.chords.length} in` : adding}
             initial={picked ?? editing?.spec ?? null}
             saved={editing?.spec ?? null}
-            chordCount={song.chords.length}
+            mine={myChords}
+            target={{ kind: 'song', keepByDefault: !editing }}
             onBrowseAll={() => go({ name: 'library' })}
             onCancel={() => {
               setPicked(null);
               replace({ name: 'song', songId: song.id });
             }}
-            onSave={(spec) => {
+            onSave={(spec, keep) => {
               setPicked(null);
               if (editing) {
                 dispatch({ type: 'UPDATE_CHORD', id: song.id, chordId: editing.id, spec });
               } else {
                 dispatch({ type: 'ADD_CHORD', id: song.id, spec });
               }
+              // A copy, the other way: the song's chord and the kept one are
+              // separate from here on. The reducer refuses what cannot be kept.
+              if (keep) dispatch({ type: 'KEEP_CHORD', spec });
               replace({ name: 'song', songId: song.id });
             }}
           />
@@ -466,7 +578,9 @@ function Router() {
       route={route}
       previous={stack[stack.length - 2]}
       songs={songs}
+      recent={recentlyOpened}
       playlistCount={playlists.length}
+      myChordCount={myChords.length}
       currentId={store.currentId}
       onGo={onGo}
       onStart={startSong}

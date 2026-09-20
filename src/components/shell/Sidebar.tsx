@@ -23,13 +23,15 @@ interface Props {
   onSignOut: () => Promise<void>;
   route: Route;
   songs: Song[];
+  /** The few opened last, already cut to length — the same list the home screen shows. */
+  recent: Song[];
   playlistCount: number;
+  /** Added to the built-in shapes for the library's count: it holds both now. */
+  myChordCount: number;
   currentId: string | null;
   onGo: (route: Route) => void;
   onStart: () => void;
 }
-
-const SHOWN = 4;
 
 /**
  * The line under the handle. It used to be the fixed words "Songs saved to
@@ -53,7 +55,7 @@ export function SyncLine({ sync }: { sync: SyncView }) {
 }
 
 /**
- * The nav, and under it the few songs you touched last, with the open one
+ * The nav, and under it the few songs you opened last, with the open one
  * selected — a way straight back into the song you were in, which is not what
  * a nav item does.
  *
@@ -69,7 +71,9 @@ export default function Sidebar({
   onSignOut,
   route,
   songs,
+  recent,
   playlistCount,
+  myChordCount,
   currentId,
   onGo,
   onStart,
@@ -77,7 +81,7 @@ export default function Sidebar({
   const inPlaylists =
     route.name === 'playlists' || route.name === 'playlist' || route.name === 'playlistAdd';
   const inShared = route.name === 'shared' || route.name === 'sharedSong';
-  const shown = songs.slice(0, SHOWN);
+  const shown = recent;
   const rest = songs.length - shown.length;
 
   return (
@@ -88,16 +92,16 @@ export default function Sidebar({
 
       <button type="button" className="nav-item" onClick={onStart}>
         <PlusCircle size={18} />
-        <span>Start something</span>
+        <span>Start a song</span>
       </button>
       <button
         type="button"
-        className={`nav-item${route.name === 'library' ? ' is-active' : ''}`}
+        className={`nav-item${route.name === 'library' || route.name === 'myChord' ? ' is-active' : ''}`}
         onClick={() => onGo({ name: 'library' })}
       >
         <GridFour size={18} />
         <span>Chord library</span>
-        <em className="nav-count">{LIBRARY.length}</em>
+        <em className="nav-count">{LIBRARY.length + myChordCount}</em>
       </button>
       <button
         type="button"

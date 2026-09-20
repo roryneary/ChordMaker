@@ -3,7 +3,6 @@ import {
   House,
   MusicNotes,
   Playlist,
-  PlusCircle,
   UserCircle,
 } from '@phosphor-icons/react';
 import type { Route } from '../../app/routes';
@@ -13,18 +12,22 @@ interface Props {
   account: Account | null;
   route: Route;
   onGo: (route: Route) => void;
-  onStart: () => void;
 }
 
 /* Each tab is named for what is behind it. There was a "Gig bag" here, which
    was the song list under a name that had to be explained; it is "Songs" now,
-   and playlists have a tab of their own rather than a section inside it. */
+   and playlists have a tab of their own rather than a section inside it.
+
+   Ordered by what is yours: your songs, then your playlists, then the fixed
+   library, then you. "Start" was a tab here and is not one now — it was the
+   only action among five destinations, and both Home and Songs open a new
+   song (Songs from its "New song" button, whether or not the list is empty),
+   so the bar lost a tab rather than the app losing a door. */
 const ITEMS = [
   { key: 'home', label: 'Home', Icon: House },
-  { key: 'start', label: 'Start', Icon: PlusCircle },
-  { key: 'chords', label: 'Chords', Icon: GridFour },
   { key: 'songs', label: 'Songs', Icon: MusicNotes },
   { key: 'playlists', label: 'Playlists', Icon: Playlist },
+  { key: 'chords', label: 'Chords', Icon: GridFour },
 ] as const;
 
 /**
@@ -35,14 +38,14 @@ const ITEMS = [
  * of the desktop nav — without it there was no way to reach sign-in on a
  * phone at all, only the sidebar had the door in.
  */
-export default function TabBar({ account, route, onGo, onStart }: Props) {
+export default function TabBar({ account, route, onGo }: Props) {
   const activeKey =
     route.name === 'library'
       ? 'chords'
       : route.name === 'landing'
         ? 'home'
-        : /* Shared songs has no tab of its own — six is what fits — and is
-             reached from Songs, so that is the tab it sits under. */
+        : /* Shared songs has no tab of its own and is reached from Songs,
+             so that is the tab it sits under. */
           route.name === 'songs' || route.name === 'shared'
           ? 'songs'
           : route.name === 'playlists' || route.name === 'playlist'
@@ -62,8 +65,7 @@ export default function TabBar({ account, route, onGo, onStart }: Props) {
             className={`tab-item${active ? ' is-active' : ''}`}
             aria-current={active ? 'page' : undefined}
             onClick={() => {
-              if (key === 'start') onStart();
-              else if (key === 'chords') onGo({ name: 'library' });
+              if (key === 'chords') onGo({ name: 'library' });
               else if (key === 'songs') onGo({ name: 'songs' });
               else if (key === 'playlists') onGo({ name: 'playlists' });
               else onGo({ name: 'landing' });

@@ -13,6 +13,15 @@ export function songSubLine(song: Song): string {
   return bits.join(' · ') || 'Nothing in it yet';
 }
 
+/**
+ * No name, no words, no chords: what a start card leaves behind when it is
+ * tapped and backed out of. The capo is not counted — an answer to "which
+ * fret?" about a song with nothing in it is not something anyone would miss.
+ */
+export function isBlankSong(song: Song): boolean {
+  return !song.title.trim() && !song.lyric.trim() && song.chords.length === 0;
+}
+
 /* There is deliberately no "how far along is it" tag. There was one — "Just
    chords", "Half done", "Ready" — and it called a song unfinished until every
    lyric line had a chord dropped on it. Dropping chords on words is a nice to

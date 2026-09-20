@@ -69,6 +69,74 @@ Playlists have landed (see Done). What is left, in order:
 Also worth doing when it is felt: a way to see or recover **stashed songs and playlists** without
 signing back in as the account they belonged to.
 
+### 0a. My chords: landed 2026-09-20 — what is left
+
+The feature is in (see Done, and README, "My chords"). **It is not live until the rules are.**
+
+**To do first, by hand — Rory:** `firebase deploy --only firestore:rules`. `firestore.rules`
+gained `validChord` and opened `users/{uid}/chords/{chordId}` to valid creates and updates; until
+that is deployed every kept chord is a refused write and the sync line says so. **Do not push the
+client to Netlify before the rules are live.** Deploying early is harmless: the old client never
+writes to that path. Still no Java here, so the rules were reviewed by eye only. Then check — the
+Rules Playground in the console will do the refusals:
+- **First, an ordinary song and a playlist still save.** The whole file was redeployed.
+- Keep a chord, signed in, and watch the sync line; the document at `users/{me}/chords/{id}` has
+  exactly `id`, `spec`, `createdAt`, `updatedAt`. Rename it (an update). Delete it (the document goes).
+- Refused: an extra top-level key; an extra key inside `spec`; an `id` that is not the path's; the
+  retired store's shape, `{ id, spec }` with no stamps; a name of 101 characters; an empty name;
+  seven markers; someone else's uid; signed out; and `users/{me}/anything/x`, as before.
+- An old orphan at that path is still readable and deletable, and does not show up in My chords.
+- Two devices: a kept chord arrives on the second after sign-in; the same shape kept offline on
+  both ends up as one entry and one document.
+
+**Not yet checked:** anything signed in — the sync, the merge, the collapse and the stash are
+covered by reducer tests and have never met Firestore. A phone on its side. Send and Copy on a
+real phone: headless Chrome offers the rows, and only Save as a picture could be exercised.
+
+**Deliberately different from what was first agreed here:** the "Keep in My chords" box is ticked
+by default for a *new* chord only, and unticked when editing one already in the song — the first
+plan was ticked for any shape not among the 48, which would pour every touched chord of a song
+kept from someone else into the library. And there is no separate "Add to my chords" control on a
+chord in a song: opening it, ticking the box and saving is that, and costs the song nothing
+(`UPDATE_CHORD` is a no-op when nothing changed).
+
+**Deferred, each only if missed:**
+- **A "From your songs" row in the picker** — shapes found across your songs that are not kept
+  yet, each with an add. Suggestions only; the library stays explicit.
+- **"Use in a song" from the Chords tab.** Today a kept chord gets into a song from the song's
+  side, by Browse all. The other direction needs a song picker.
+- **A chord the recipient can keep**, rather than a picture: a new kind of shared document with
+  rules of its own, like song sharing.
+- **Clearing the retired store's orphans** at `users/{uid}/chords`. They are skipped, not
+  deleted. If it is done, match exactly `keys == [id, spec]` and nothing looser — "delete what I
+  cannot read" is a rule an older build would apply to a newer build's chords.
+- **A delete on one device is undone by another that still holds the chord** and has not synced
+  since — the same limit songs have, from the same merge, and not worth fixing for one and not
+  the other.
+- **A chord drawn with a string left unset is not recognised as built in.** Tap out D's three
+  fingers without marking the low strings muted and it is a different shape from the library's D
+  (`-.-.-.2.3.2`, not `x.x.0.2.3.2`), and can be kept beside it. That is `shapeKey` being honest —
+  an unset string is not a muted one — and name inference already works the same way.
+- The editor's prompt still says "these four get you through most nights" over six chips.
+
+**What the home screen is for — decided and landed 2026-09-20, see Done.** The proposal had been
+to make Home the zero-songs welcome only, and open on Songs for everyone else with a four-tab
+bar. **Decided otherwise: everyone lands on Home, and it stays a tab.** It is a welcome for
+someone with no songs and the recently opened songs for everyone else. What was found on the way:
+- ~~**On a phone, Home is the only door to a new song once you have one.**~~ Songs has a permanent
+  "New song" now.
+- ~~**The same choice is worded two ways**~~ — there is one way to start, worded one way.
+- ~~The sidebar's "Start something" only ever starts with the words.~~ It is "Start a song" and
+  does what Home's card does.
+- ~~One chord to send to someone still has to be a song.~~ It is made in the Chords tab now (§0a).
+- **Tapping a start card to see what it does leaves an empty "Untitled" behind**, which Home then
+  offers under "Pick up where you left off". **Fixed 2026-09-20:** walking out of a song with no
+  name, no words and no chords throws it away (`DISCARD_IF_BLANK` in `songsReducer`; the capo
+  alone does not save it, a playlist entry or a share does). "Walking out" is `openSongId` in
+  `routes.ts` — the chord library and sign-in, opened from inside a song, do not count as
+  leaving. Not covered: closing the tab on a blank song leaves it until it is next opened and
+  left, and blanks made before this stay until then too.
+
 ### The sharing, database and sign-in project
 
 These three are one project, not three. Sharing is the design question that decides the
@@ -302,6 +370,53 @@ Carried over from the README's "Not built" section — deliberately deferred, no
 
 ## Done
 
+- **My chords: make, keep and send a chord from the Chords tab.** §0a above has what is left, and
+  README, "My chords", has how it works and why. One chord to send to someone used to have to be
+  a song; the Chords tab, which was the one tab where nothing could be done, now makes one, keeps
+  it, and sends it as a picture, and the editor's "Browse all" picks from My chords as well as the
+  built-in shapes. **This reverses "there is no such thing as a chord without a song"**: that was
+  the cure for a store no screen read, and the fault was the missing screen. What the design
+  review changed before a line was written, because each would have been a bug: sameness is a key
+  per string on absolute frets (`shapeKey`), not `specToShape`, which is null for two barres — B
+  drawn that way would not have been recognised as built in; sign-in merges by id but the rule is
+  by shape, so `HYDRATE` collapses duplicates with a tie-free rule both devices agree on;
+  `parseMyChord` is strict about stamps so the retired store's documents at the same Firestore
+  path stay buried; `UPDATE_CHORD` is a no-op when nothing changed, so opening a chord to tick the
+  box does not re-sync the song or mark a shared one "changed"; the keep row is always there and
+  only its words change, so Save does not jump about; `myChord` is looked through by `openSongId`
+  so it can never get a blank song beneath it discarded; and the name is capped at the same 100
+  in the input, the reducer and the rules.
+  **Checked 2026-09-20** in headless Chrome at 390 px and 1280 px, signed out: make and save from
+  the Chords tab; a built-in shape refused there with the reason shown; the sheet, for one of mine
+  and for a built-in; picked into a song through Browse all with its name; a shape built in a song
+  kept by the ticked box; an unchanged save leaving the song's stamp alone; delete from My chords
+  with the song keeping its copy; the sidebar count; no page errors.
+
+- **Home welcomes a new player, and holds the songs you opened last; one way to start.** Everyone
+  lands on Home. With no songs on the device it is a welcome — what the app makes, "Start a
+  song", "See a song someone has shared" (a finished sheet explains the app faster than a
+  sentence), and "Already have songs? Sign in", because someone with forty songs on another
+  device arrives looking exactly like someone with none. With songs it is "What are we
+  playing?" over the four opened last, a way through to all of them, and "Start a new song".
+  **"A song to play" and "Just the chords" are one "Start a song"**, landing on the song screen:
+  both made the same song and differed only in which screen came next, so a new player was asked
+  to choose a workflow before seeing either — and the song screen already focuses a fresh song's
+  title and offers both the add-chord tile and "Paste the words in". Songs' empty state and the
+  sidebar say the same thing, and **Songs has a permanent "New song"**, without which a phone
+  with one song could only start a second from Home.
+  **"Recent" is new, and is not `updatedAt`.** The app had no record of what was opened: the
+  list was in creation order, re-sorted by last edit only at sign-in, so "pick up where you left
+  off" was really "the last song you made". Opening a song to play it is not an edit — stamping
+  `updatedAt` would send a write per reading and tell everyone holding a copy of a shared song
+  that it had changed — so the opened-last ids are kept beside the store (`lib/recent.ts`,
+  `useRecent`), on this device only, and ids with no song behind them are simply skipped. With
+  nothing opened yet, it falls back to latest edits. The sidebar's "Recent" reads the same list.
+  **Checked 2026-09-20** in headless Chrome at 390 px and 1280 px, signed out: the welcome, three
+  songs started and named from Home, the oldest opened from Songs coming to the front, the order
+  surviving a reload, no page errors. **Not yet checked:** signed in; a phone on its side.
+  *Noticed:* after a blank song is discarded the sidebar marks `songs[0]` as "open" —
+  `DELETE_SONG` moves `currentId` there — though nobody opened it.
+
 - **A "Saved" line where the writing happens, and still no Save button.** Autosave was invisible:
   the one honest sentence about it was on the sidebar chip and the Account screen, and `chromeFor`
   gives the song screen and the words editor no chrome on a phone — so for the whole time you were
@@ -376,8 +491,11 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   can always take them out" basis: they are `memberships`/`onOpenPlaylist` on `SongCard`, and
   leaving those props off removes them.
   **"Gig bag" is retired** as a name and as a screen-of-sections: Songs and Playlists are separate
-  destinations in both navs. The phone's tab bar is now six items, which fits at 360 px but is the
-  limit — "Start" duplicates the home screen's two cards and is the one to drop if it feels tight.
+  destinations in both navs. The phone's tab bar went to six items, which fit at 360 px but was
+  the limit; **"Start" was dropped on 2026-09-20** as anticipated here — it duplicated the home
+  screen's two cards, and it was the one action among five destinations. The bar is five now:
+  Home, Songs, Playlists, Chords, Account, ordered by what is yours before what is fixed. The
+  sidebar keeps "Start something", so the desktop nav is unchanged.
   README, "Playlists", has the reasoning. **Checked by hand on 2026-09-19** in a headless browser,
   signed out: create from a song row, pill → playlist with the row lit, add step, reorder, rename,
   persistence. **Not yet checked:** a signed-in round trip to Firestore.

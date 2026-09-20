@@ -3,7 +3,7 @@ rules_version = '2';
 /*
  * Four places, and the split between them is the whole design.
  *
- * A user's songs and playlists live under their own uid, so the path is the
+ * A user's songs, playlists and chords live under their own uid, so the path is the
  * owner of record — see ROADMAP.md §1. Nobody else is ever let in there, for
  * any reason: that one fact is what makes an unshared song private, and it is
  * why sharing a song *copies it out* to `shared` instead of opening it up.
@@ -17,9 +17,10 @@ rules_version = '2';
  * Anything not named here is refused. There used to be a wildcard under
  * `users/{uid}`, which let a signed-in user keep any data of any shape under
  * their own uid on this project's bill. The price of naming things is that
- * THESE FIELD LISTS MUST BE KEPT IN STEP with `src/types/song.ts` and
- * `src/types/playlist.ts`: add a field there and not here, and every save of
- * every song is refused. The app says so (lib/syncStatus.ts), but only once it
+ * THESE FIELD LISTS MUST BE KEPT IN STEP with `src/types/song.ts`,
+ * `src/types/playlist.ts` and `src/types/myChord.ts` (and, for a chord's
+ * `spec`, `src/types/chord.ts`): add a field there and not here, and every
+ * save of every song is refused. The app says so (lib/syncStatus.ts), but only once it
  * has happened.
  */
 service cloud.firestore {
@@ -72,6 +73,29 @@ service cloud.firestore {
         && p.createdAt is number && p.updatedAt is number;
     }
 
+    /*
+     * One of "My chords". A song's chords are a list, and rules cannot look
+     * inside a list, so this is the one place a chord's own fields are checked.
+     * The name's 100 is `MAX_CHORD_NAME` in `src/lib/myChords.ts`; the editor
+     * and the reducer hold to it, so a name is never a write refused for good.
+     * Six strings; five frets of six strings is thirty dots; a barre a fret
+     * would be five, so six. The two stamps are required, and that is also
+     * what keeps the retired store's `{ id, spec }` documents from being
+     * written back: see the path below.
+     */
+    function validChord(c, chordId) {
+      return c.keys().hasOnly(['id', 'spec', 'createdAt', 'updatedAt'])
+        && c.id == chordId
+        && c.spec is map
+        && c.spec.keys().hasOnly(['name', 'rootFret', 'fretCount', 'markers', 'dots', 'barres'])
+        && c.spec.name is string && c.spec.name.size() >= 1 && c.spec.name.size() <= 100
+        && c.spec.rootFret is number && c.spec.fretCount is number
+        && c.spec.markers is list && c.spec.markers.size() <= 6
+        && c.spec.dots is list && c.spec.dots.size() <= 30
+        && c.spec.barres is list && c.spec.barres.size() <= 6
+        && c.createdAt is number && c.updatedAt is number;
+    }
+
     // The profile: the claimed handle, written by `claimUsername`.
     match /users/{uid} {
       allow read: if isOwner(uid);
@@ -92,10 +116,13 @@ service cloud.firestore {
         allow create, update: if isOwner(uid) && validPlaylist(request.resource.data, playlistId);
       }
 
-      // The retired loose-chord store (README, "Screens"). What is there can
-      // be read and cleared by its owner; nothing new goes in.
+      // "My chords" (README, "My chords"). This path was the retired
+      // loose-chord store's, and its documents may still be here: bare
+      // `{ id, spec }`, no stamps. They can be read and cleared, the app
+      // ignores them, and `validChord` will not let one be written again.
       match /chords/{chordId} {
         allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validChord(request.resource.data, chordId);
       }
     }
 

@@ -323,8 +323,30 @@ h1, h2, h3, h4 {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 14px 24px 0;
+  /* It scrolls: a few recent songs with their shapes are taller than a phone. */
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 24px 24px;
   max-width: 720px;
+}
+
+.landing-lede {
+  margin: 16px 0 0;
+  max-width: 46ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--color-text) 68%, transparent);
+}
+
+.landing-more { align-self: flex-start; margin: 8px 0 0 calc(-1 * var(--space-1)); gap: 4px; }
+
+/* The quiet doors under the welcome: someone else's song, and sign-in. */
+.landing-doors {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 18px 0 0 calc(-1 * var(--space-1));
 }
 
 .greeting {
@@ -457,6 +479,8 @@ h1, h2, h3, h4 {
   overflow-y: auto;
   padding: 14px 24px 24px;
 }
+.songs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.songs-new { flex: none; gap: 5px; padding: 6px 12px; font-size: 13px; }
 .songs-list { list-style: none; margin: 4px 0 0; padding: 0; }
 .songs-empty {
   margin-top: 28px;
@@ -963,6 +987,22 @@ h1, h2, h3, h4 {
    phone, and a second row would push the way out further below the fold. Save
    sits on the right, under the thumb. The leave-without-saving sheet reuses it. */
 .editor-actions { display: flex; gap: 8px; }
+
+/* "Keep in My chords", over Back and Save. The row is a fixed height whatever
+   it holds — a tick-box, or a line saying why there is none — so the buttons
+   under it do not move as the shape on the plate changes. */
+.editor-keep {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  margin-bottom: 8px;
+  font-size: 13.5px;
+  color: color-mix(in srgb, var(--color-text) 62%, transparent);
+}
+.editor-keep p { margin: 0; line-height: 1.35; }
+.editor-keep label { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; color: var(--color-text); }
+.editor-keep input { width: 17px; height: 17px; margin: 0; accent-color: var(--color-accent); }
+.editor-keep input:disabled + *, .editor-keep label:has(input:disabled) { opacity: 0.45; cursor: default; }
 .editor-actions .btn-block { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 10px; }
 
 @media (min-width: 1024px) {
@@ -1199,6 +1239,32 @@ button.word:hover .word-text {
 .library-head .icon-btn { margin-left: -8px; flex: none; }
 .chord-cell.is-static { cursor: default; }
 
+/* My chords, at the head of the library. */
+.library-mine-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.library-make { flex: none; gap: 5px; padding: 6px 12px; font-size: 13px; }
+.library-mine-empty {
+  margin: 12px 0 0;
+  max-width: 44ch;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+/* One chord, opened. */
+.chord-sheet h2 { margin-bottom: 4px; }
+.chord-sheet-diagram { width: 150px; margin: 0 auto 6px; }
+.chord-sheet-own {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  /* No rule of its own: the last share row above draws one. */
+  margin-top: 10px;
+}
+.chord-sheet-own .btn-ghost { gap: 6px; font-size: 13.5px; }
+.btn-ghost.is-danger { color: var(--color-danger); }
+.btn-ghost.is-danger:hover { background: color-mix(in srgb, var(--color-danger) 10%, transparent); }
+
 
 /* --- The opening --------------------------------------------------------- */
 /* A crossfade needs both halves moving at once, so the app is mounted and laid
@@ -1333,7 +1399,9 @@ button.word:hover .word-text {
    the shared look lives on .user-chip and only the affordance is added here. */
 .user-chip.is-action {
   width: 100%;
-  border: 1px solid var(--color-divider);
+  /* None, not a divider line: .user-chip's shadow is already a 1px ring, and
+     a border inside it drew the outline twice. */
+  border: 0;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -1366,27 +1434,53 @@ button.word:hover .word-text {
   cursor: pointer;
 }
 
+/* `width: 100%` is load-bearing. .shell-main is a flex column, and an auto
+   side margin on a flex item cancels its stretch — without the width this
+   column shrinks to its widest line of text, and the account screen, whose
+   widest line is its heading, came out a third of the size it was drawn at.
+
+   Spacing here is set per element rather than by one gap: the screen is a
+   heading, a form and a footnote, and they do not want the same distance. */
 .signin {
-  max-width: 380px;
+  width: 100%;
+  max-width: 408px;
   margin: 0 auto;
-  padding: var(--space-4) var(--space-3) var(--space-6);
+  padding: clamp(16px, 9vh, 96px) 24px 40px;
+  flex: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
 }
 
-.signin .brand { margin-top: var(--space-2); }
+/* The shell is a fixed height and every screen scrolls its own body. This one
+   scrolls its parent instead, so the scrollbar sits at the window's edge and
+   not down the side of a 408px column. */
+.shell-main:has(> .signin) { overflow-y: auto; }
+
+/* Pulled left so the arrow's stroke, not its hit area, lines up with the text. */
+.signin > .icon-btn { margin: 0 0 28px -7px; }
+
+/* `display` undoes the desktop rule that hides .brand-sm because the sidebar
+   already shows the lockup: this screen has no sidebar at any width. */
+.signin .brand { display: flex; margin-bottom: 22px; }
+
+.signin h1 { font-size: 28px; margin-bottom: 10px; }
 
 .signin-sub {
-  margin: 0 0 var(--space-2);
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  margin: 0 0 28px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-text) 58%, transparent);
 }
+
+/* Fields and buttons share a height, so the column reads as one stack. */
+.signin .input { padding: 11px 14px; line-height: 1.45; }
+.signin .btn-block { min-height: 46px; padding-block: 0; font-weight: 500; }
 
 .signin-google {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  background: var(--color-surface);
 }
 
 /* A rule with the word sitting in it, rather than a rule and a floating word. */
@@ -1397,6 +1491,7 @@ button.word:hover .word-text {
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
   font-size: 12px;
   text-transform: lowercase;
+  margin: 20px 0 8px;
 }
 .signin-or::before,
 .signin-or::after {
@@ -1409,18 +1504,34 @@ button.word:hover .word-text {
 .signin-form {
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
-.signin-form .micro-label { margin-top: var(--space-1); }
-.signin-form .btn-block { margin-top: var(--space-2); }
+.signin-form .micro-label { margin: 14px 0 7px; }
+.signin-form .btn-block { margin-top: 22px; }
 
-.signin-hint { margin: 2px 0 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.signin-hint { margin: 8px 0 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 58%, transparent); }
 /* Errors are a colour and a sentence, never an icon and a code. */
-.signin-error { margin: 2px 0 0; font-size: 13px; color: var(--color-danger); }
+.signin-error { margin: 8px 0 0; font-size: 13px; color: var(--color-danger); }
 
 .signin-foot {
   display: flex;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-top: var(--space-1);
+  margin-top: 14px;
 }
+
+/* The account step. The chip is the sidebar's, drawn at the sidebar's size —
+   right for a 234px rail, small print as the one object on a whole screen. */
+.signin-account h1 { margin-bottom: 24px; }
+.signin-account .user-chip {
+  margin-top: 0;
+  gap: 13px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+}
+.signin-account .avatar { width: 42px; height: 42px; font-size: 16px; }
+.signin-account .user-meta strong { font-size: 16px; font-weight: 500; }
+.signin-account .user-meta em { font-size: 13px; }
+.signin-account .account-sync { margin: 10px 4px 0; }
+.signin-account .account-sync em { font-size: 12.5px; }
+.signin-account .sync-retry { font-size: 12.5px; }
+.signin-account > .btn-block { margin-top: 32px; }

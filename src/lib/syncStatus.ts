@@ -143,7 +143,7 @@ export function syncLabel(phase: SyncPhase, error: string | null, unsynced: numb
 export interface SyncView {
   phase: SyncPhase;
   label: string;
-  /** How many songs and playlists the account has not confirmed. */
+  /** How many songs, playlists and kept chords the account has not confirmed. */
   unsynced: number;
   retry: () => void;
 }

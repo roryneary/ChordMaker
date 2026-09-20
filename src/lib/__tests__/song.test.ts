@@ -77,6 +77,65 @@ describe('the store', () => {
   });
 });
 
+/* A start card makes its song on the tap. Backed out of untouched, it would be
+   an "Untitled" with nothing in it, in Songs and on the account. */
+describe('walking away from a song with nothing in it', () => {
+  const blank = (): { store: SongStore; id: string } => {
+    const kept = songsReducer(emptyStore(), { type: 'CREATE_SONG', title: 'Kept' });
+    const store = songsReducer(kept, { type: 'CREATE_SONG', title: '' });
+    return { store, id: store.currentId! };
+  };
+  const discard = (store: SongStore, id: string) =>
+    songsReducer(store, { type: 'DISCARD_IF_BLANK', id });
+
+  it('throws it away, as a delete the account hears about', () => {
+    const { store, id } = blank();
+    const after = discard(store, id);
+    expect(after.songs.map((s) => s.title)).toEqual(['Kept']);
+    expect(after.currentId).toBe(after.songs[0].id);
+    expect(after.unsynced).toContain(id);
+  });
+
+  it('counts a name of spaces, and words of blank lines, as nothing', () => {
+    const { store, id } = blank();
+    let spaced = songsReducer(store, { type: 'SET_TITLE', id, title: '  ' });
+    spaced = songsReducer(spaced, { type: 'SET_LYRIC', id, lyric: '\n \n' });
+    spaced = songsReducer(spaced, { type: 'SET_CAPO', id, capo: 2 });
+    expect(discard(spaced, id).songs).toHaveLength(1);
+  });
+
+  it('keeps a song with a name, or words, or a chord', () => {
+    const { store, id } = blank();
+    const edits = [
+      songsReducer(store, { type: 'SET_TITLE', id, title: 'Harbour Lights' }),
+      songsReducer(store, { type: 'SET_LYRIC', id, lyric: 'Down by the water' }),
+      songsReducer(store, { type: 'ADD_CHORD', id, spec: spec('G') }),
+    ];
+    for (const edited of edits) expect(discard(edited, id)).toBe(edited);
+  });
+
+  it('leaves alone one that is in a playlist, or shared', () => {
+    const { store, id } = blank();
+    const listed = songsReducer(store, { type: 'CREATE_PLAYLIST', name: 'Friday', songIds: [id] });
+    expect(discard(listed, id)).toBe(listed);
+
+    const shared = songsReducer(store, {
+      type: 'SONG_SHARED',
+      id,
+      shareId: 'sh1',
+      version: 1,
+      listed: false,
+      sentUpdatedAt: null,
+    });
+    expect(discard(shared, id)).toBe(shared);
+  });
+
+  it('does nothing for a song that is not there', () => {
+    const { store } = blank();
+    expect(discard(store, 'gone')).toBe(store);
+  });
+});
+
 /**
  * The list of ids the account has not confirmed. It is kept by the reducer so
  * that recording a change is atomic with making it, and it is what stops an
@@ -248,6 +307,24 @@ describe('chords', () => {
     store = songsReducer(store, { type: 'UPDATE_CHORD', id, chordId: only, spec: spec(' ') });
     expect(store).toBe(named);
     expect(store.songs[0].chords[0].spec.name).toBe('Am');
+  });
+
+  it('treats saving a chord unchanged as no edit', () => {
+    // A chord is opened just to tick "Keep in My chords". A new song object
+    // would move `updatedAt`: a needless sync, and "changed" to everyone
+    // holding a copy of a shared song.
+    let store = storeWithSong().store;
+    const id = store.currentId!;
+    store = songsReducer(store, { type: 'ADD_CHORD', id, spec: spec('G'), chordId: 'c1' });
+    const before = { ...store, unsynced: [] };
+
+    const after = songsReducer(before, {
+      type: 'UPDATE_CHORD',
+      id,
+      chordId: 'c1',
+      spec: spec('  G '),
+    });
+    expect(after).toBe(before);
   });
 
   it('drops placements for a chord that is removed', () => {

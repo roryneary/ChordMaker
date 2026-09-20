@@ -99,7 +99,7 @@ export default function SongScreen({
   const hasLyric = song.lyric.trim().length > 0;
   /* A song with nothing in it yet has just been made, and the first thing it
      needs is a name. autoFocus only acts at mount, which is exactly then — and
-     it is what lets "Just the chords" go name, capo, Add without a wasted tap. */
+     it is what lets a lesson go name, capo, Add without a wasted tap. */
   const fresh = !song.title.trim() && song.chords.length === 0 && !hasLyric;
 
   /**

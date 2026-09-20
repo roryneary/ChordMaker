@@ -63,6 +63,15 @@ describe('which chrome a screen gets', () => {
     expect(mobile({ name: 'ready', songId: 's1' })).toBe('none');
   });
 
+  /* Making or editing one of My chords is editing, though no song is open. */
+  it('withholds the tab bar from a chord of your own, and treats the library opened from it as a step', () => {
+    const myChord: Route = { name: 'myChord', chordId: null };
+    expect(mobile(myChord, { name: 'library' })).toBe('none');
+    expect(desktop(myChord, { name: 'library' })).toBe('sidebar');
+    expect(mobile({ name: 'library' }, myChord)).toBe('none');
+    expect(libraryIsStep(myChord)).toBe(true);
+  });
+
   /* The library is a destination from the tab bar but a STEP when reached from
      the chord editor's "All 48" — and a tab bar there invites you to walk out
      of the song you are part-way through building. */

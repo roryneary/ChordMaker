@@ -83,7 +83,8 @@ the LCS carries every id across.
 ## The chord library
 
 `src/data/chordLibrary.ts` — 48 shapes in the bundle, about 1.5 kB. No fetch, no schema, no
-server, and it works with no signal. Every count shown in the UI reads `LIBRARY.length`.
+server, and it works with no signal. Every count of the built-in shapes reads `LIBRARY.length`;
+the sidebar's number beside "Chord library" adds My chords to it, because the library holds both.
 
 Shapes use the design's compact notation (`x32010`), converted to `ChordSpec` by
 `src/lib/shape.ts`. `ChordSpec` stays canonical because the string cannot express more than one
@@ -102,17 +103,28 @@ and F#m7 (`202220`) draw a bar over strings the player is letting ring.
 A handful of routes and a back-stack in `src/app/routes.ts` — no router library. The stack exists
 because full screen must return to the screen you came from, not the landing page.
 
-The landing page offers two ways in, and **both make a song** — they differ only in which half
-comes first:
+**Everyone lands on the home screen, and it is two screens**, told apart by whether there is a
+song on the device. With none it is a welcome: what the app makes, the one way to start, a way to
+see a song someone else has shared, and sign-in — because someone with forty songs on another
+device arrives looking exactly like someone with none. With songs it is the few opened last.
 
-- **A song to play**: landing → words → song → chord editor / full screen / ready.
-- **Just the chords**: landing → song, skipping the words. It is for a lesson where a tutor is
-  calling out chords: the title is focused as the screen opens, so it is name, capo, Add. The
-  editor has one Save, which returns to the song — a second "Save, add another" button that
-  cleared the plate in place was removed because two saves on one screen confused more than the
-  round trip cost. Back (the arrow at the top, or the button beside Save) leaves
-  without saving, and asks first if the chord has changed (`chordChanged` in `lib/chordEdits.ts`). The words are added later from the
-  same song; nothing is converted, because it was never anything but a song.
+"Opened last" is not `updatedAt`. Opening a song to play it is not an edit, and stamping it as one
+would send a write to the account per reading and tell everyone holding a copy of a shared song
+that it had changed. So the ids are kept beside the store, on this device (`lib/recent.ts`,
+`useRecent`); an id with no song behind it is skipped, so nothing has to keep the two in step, and
+with nothing opened yet the list falls back to the latest edits. The sidebar's "Recent" is the
+same list.
+
+**There is one way to start a song**: landing → song → chord editor / words / full screen / ready.
+There were two, "A song to play" (landing → words) and "Just the chords" (landing → song), which
+made the same song and differed only in which screen came next — a new player was asked to choose
+a workflow before seeing either. The song screen serves both: the title of a song with nothing in
+it is focused as the screen opens, so a lesson where a tutor is calling out chords is still name,
+capo, Add, and "Paste the words in" is one tap away for someone who has the words first. The
+editor has one Save, which returns to the song — a second "Save, add another" button that
+cleared the plate in place was removed because two saves on one screen confused more than the
+round trip cost. Back (the arrow at the top, or the button beside Save) leaves
+without saving, and asks first if the chord has changed (`chordChanged` in `lib/chordEdits.ts`).
 
 **Full screen pins the chord shapes above the words.** The strip sits between the bar and
 `.fs-words`, which is the one that scrolls — being outside the scroller is the whole mechanism,
@@ -124,12 +136,15 @@ sideways rather than wrapping, because every row it wrapped onto would come out 
 the diagrams are small (64 px, 88 px on desktop) on the grounds that mid-song you are checking
 a shape you already know. The PDF's chord reference row is the same idea on paper.
 
-**There is no such thing as a chord without a song.** "Just one chord" used to open the editor
-with no song and save to a store of its own (`USER_CHORDS_KEY`, mirrored to `users/{uid}/chords`)
-that no screen ever read back: a second persistence path that went nowhere. It is gone.
-`loadStore` folds anything left in that key into one song titled "Loose chords" and removes the
-key; the remote `users/{uid}/chords` documents are left where they are as orphaned data, since
-the rules already cover them and nothing reads them. `#/chord/new/new` now goes home.
+**A chord can exist without a song, in My chords — and only there.** This reverses what stood
+here, "there is no such thing as a chord without a song". That was the cure for a real fault:
+"Just one chord" used to open the editor with no song and save to a store of its own
+(`USER_CHORDS_KEY`, mirrored to `users/{uid}/chords`) that no screen ever read back, a second
+persistence path that went nowhere. The diagnosis was right and the cure too strong — the fault
+was the missing screen, and the Chords tab is that screen. See "My chords" below. The retired
+store is still gone: `loadStore` folds anything left in that key into one song titled "Loose
+chords" and removes the key, and `#/chord/new/new` still goes home rather than to the new editor
+(`#/library/chord/new`), so an old bookmark does not start making chords.
 
 **Songs and Playlists are two destinations, in both navs** (`#/songs`, `#/playlists`). The
 sidebar shows the last few songs and the tab bar shows none, so Songs is the only way to an
@@ -142,6 +157,71 @@ song or reading full screen. The library is a *step* when opened from the editor
 *destination* when opened from a browsing screen — `libraryIsStep` decides, and with it who
 owns the way out. One playlist is a browsing screen and keeps the tabs; adding songs to it is a
 step with one action of its own, and gets none.
+
+## My chords
+
+The Chords tab holds the built-in shapes and, above them, **My chords**: shapes the player made
+and chose to keep, outside any song. It is where one chord is made to send to someone — which
+used to mean making a song to hold it — and what the editor's "Browse all" picks from.
+
+**A song's chords are still the song's own.** Picking from My chords copies the `spec` into the
+song exactly as picking a built-in shape does; `SavedChord` records no origin and must not start
+to. Editing or deleting a kept chord never reaches into a song, and the delete sheet says so.
+That is what keeps a song one self-contained document, which sharing, both exporters and the
+offline read all rest on. The price, accepted: a better fingering found later does not
+propagate. If that ever hurts, the answer is a deliberate "replace this shape in my other songs"
+that lists them and asks — never a live link.
+
+**Keeping is explicit, and a copy in the other direction.** Deriving the library from every
+chord in every song was considered and dropped: a derived entry cannot be deleted (it comes back
+while any song holds it), and a song kept from someone else would pour its shapes in as yours.
+There are two ways in. **Make a chord** in the Chords tab, where Save *is* keeping. And in a
+song's editor, a **"Keep in My chords" tick-box over the one Save** — a box, not a second button;
+two saves on one screen were tried and confused. It starts ticked for a new chord and *unticked*
+for one already in the song, or every chord touched in a shared song would pour in; opening a
+chord, ticking the box and saving is how a shape made before this existed is kept. That save must
+not count as an edit, so `UPDATE_CHORD` returns the same song when nothing changed — otherwise
+`updatedAt` moves, the song syncs again, and everyone holding a copy is told it changed.
+
+**One entry per shape**, and a built-in shape is never listed again as yours. Sameness is
+`shapeKey` in `lib/myChords.ts`: per string, the absolute fret it is stopped at, or open, muted
+or unset. Absolute, so the window does not matter; per string, so a barre and the same strings
+fretted one by one are one chord. It is deliberately not `specToShape`, which is null for two
+barres or a fret past nine: B drawn with two barres would have fallen to some second scheme, B
+drawn with dots would not, and the first would not have been recognised as built in. The rule is
+the reducer's (`KEEP_CHORD`, `UPDATE_MY_CHORD`); the editor asks `keepOffer` first so it can say
+*why* — "one of the built-in shapes", "already in My chords, as …" — in a row that is always
+there, because a shape passes through Em on its way to something else and a box that came and
+went would shove Save about. From the Chords tab a shape that cannot be kept cannot be saved,
+rather than Save silently doing nothing.
+
+**It is in the song store, like playlists** (`SongStore.chords`, `unsyncedChords`), for the
+plumbing and not for any tie to songs — no song action touches it and none of its actions touches
+a song. One document per chord at `users/{uid}/chords/{chordId}` (`lib/chordSync.ts`), with the
+same unconfirmed list, merge and stash. Two things are its own:
+
+- **Sign-in merges by id and the rule is by shape**, so the same shape kept offline on a phone and
+  a laptop arrives as two. `HYDRATE` runs `collapseByShape`: the older wins, then the lower id — no
+  tie, so both devices drop the same one — and the loser is listed as unconfirmed with nothing
+  behind it, which is how a delete is spelled.
+- **That Firestore path had a tenant.** The retired store's documents may still be there, bare
+  `{ id, spec }`. `parseMyChord` will not read a chord without its two stamps — strict on purpose,
+  unlike `parseSong` and `parsePlaylist`, and tested so nobody evens it up — so they are skipped
+  instead of coming back as duplicates of the "Loose chords" song. They are not cleared on the way
+  past: "delete what I cannot read" is a rule an older build would apply to a newer build's chords.
+  `validChord` in `firestore.rules` requires the stamps too, and is the one place a chord's own
+  fields are checked at all — a song's chords are a list, and rules cannot look inside a list.
+
+**Sending a chord is sending a picture of it.** Any chord in the Chords tab, yours or built in,
+opens a sheet with the three rows the Ready sheet offers for a song: send, save as a picture,
+copy. A chord the recipient could *keep* would be a new kind of shared document with rules of its
+own; not built.
+
+The Chords tab is two screens, as it always was. Under an editor it is a step: a tap hands the
+shape back (the shape, not the name — two voicings of G are both "G"), and there is no Make,
+which would be one editor on top of another. Otherwise it is a place. The route for a chord of
+your own, `myChord`, is looked through by `openSongId` like the library is, so that reaching it
+with a blank song underneath can never get that song thrown away.
 
 ## Playlists
 
@@ -337,7 +417,8 @@ true, because for a while it did not: every Firestore call was fire-and-forget, 
 became an unhandled rejection, and the sidebar said "Songs saved to your account" regardless. A
 broken sync was indistinguishable from a working one.
 
-**The store lists what the account has not confirmed** (`SongStore.unsynced`). The reducer adds
+**The store lists what the account has not confirmed** (`SongStore.unsynced`; playlists and My
+chords each have a list of their own beside it, and the sync line counts all three). The reducer adds
 an id whenever it creates, edits or deletes a song — atomically with the change, which an effect
 marking ids after the render could not do — and only the account's own answer takes it off
 (`SYNCED`, which compares `updatedAt` so an edit made while a write was in flight stays listed).

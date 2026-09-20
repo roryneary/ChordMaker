@@ -109,7 +109,7 @@ export function mergeOnSignIn<T extends { id: string }>(
 
 /** Which library a stash holds. Songs keep the unprefixed key they always had,
     so a stash written before playlists existed is still found. */
-export type StashBucket = 'songs' | 'playlists';
+export type StashBucket = 'songs' | 'playlists' | 'chords';
 
 const stashKey = (owner: string | null, bucket: StashBucket) =>
   `${STASH_PREFIX}${bucket === 'songs' ? '' : `${bucket}:`}${owner ?? 'nobody'}`;

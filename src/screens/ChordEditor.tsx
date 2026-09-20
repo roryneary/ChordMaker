@@ -7,30 +7,54 @@ import { chordChanged } from '../lib/chordEdits';
 import { inferChordName } from '../lib/chordName';
 import { chordFilename, chordToPngBlob, downloadBlob } from '../lib/exportPng';
 import { MAX_ROOT_FRET, MIN_ROOT_FRET } from '../lib/layout';
+import { MAX_CHORD_NAME, findMine, keepOffer } from '../lib/myChords';
 import { ordinal, toRoman } from '../lib/numerals';
 import { specToShape } from '../lib/shape';
 import { useThemeValue } from '../theme/ThemeProvider';
 import type { ChordSpec, StringNumber } from '../types/chord';
+import type { MyChord } from '../types/myChord';
 
 interface Props {
-  /** The song this chord belongs to. Null only while it has no name yet. */
-  songTitle: string | null;
-  /** How many chords the song already has, so the bar can keep count. */
-  chordCount: number;
+  /** What the bar says this chord is for: "Adding to Harbour Lights · 3 in", "A chord of your own". */
+  where: string;
   initial: ChordSpec | null;
-  /** The chord as the song holds it, or null for a new one — what "unsaved" is measured against. */
+  /** The chord as it is held, or null for a new one — what "unsaved" is measured against. */
   saved: ChordSpec | null;
-  onSave: (spec: ChordSpec) => void;
+  /** My chords, which decide what the keep row says: see `keepOffer`. */
+  mine: MyChord[];
+  /**
+   * Where Save puts the chord.
+   *
+   * In a song, Save puts it in the song, and a tick-box offers to keep it in
+   * My chords as well — a box, not a second button: two saves on one screen
+   * were tried and confused. It starts ticked for a new chord and unticked for
+   * one already in the song, or every chord touched in a song kept from
+   * someone else would pour into the library.
+   *
+   * From the Chords tab there is no song: Save *is* keeping it, so there is no
+   * box, and a shape that cannot be kept cannot be saved — the row says why,
+   * rather than Save doing nothing. `id` is the chord being changed, so its own
+   * shape does not count against it.
+   */
+  target: { kind: 'song'; keepByDefault: boolean } | { kind: 'mine'; id: string | null };
+  /** `keep`: also put it in My chords. Always false from the Chords tab, where that is what Save does. */
+  onSave: (spec: ChordSpec, keep: boolean) => void;
   onCancel: () => void;
   onBrowseAll: () => void;
 }
 
+const keptAs = (chord: MyChord | null) => {
+  const name = chord?.spec.name.trim();
+  return name ? `, as ${name}` : '';
+};
+
 /** M02. One shape, defined on the fretboard or taken from the library. */
 export default function ChordEditor({
-  songTitle,
-  chordCount,
+  where,
   initial,
   saved,
+  mine,
+  target,
   onSave,
   onCancel,
   onBrowseAll,
@@ -46,6 +70,8 @@ export default function ChordEditor({
   const [typedName, setTypedName] = useState<string | null>(initial?.name || null);
   const [savingImage, setSavingImage] = useState(false);
   const [confirmingLeave, setConfirmingLeave] = useState(false);
+  // Null means "follow the default", as `typedName` does; a boolean is the player's own answer.
+  const [keepChoice, setKeepChoice] = useState<boolean | null>(null);
 
   const inferred = inferChordName(spec);
   const name = typedName ?? inferred ?? '';
@@ -108,6 +134,22 @@ export default function ChordEditor({
      recognise, which are exactly the ones the player has to label. */
   const unnamed = !name.trim();
 
+  const inSong = target.kind === 'song';
+  const ownId = target.kind === 'mine' ? (target.id ?? undefined) : undefined;
+  const offer = keepOffer(mine, spec, ownId);
+  const keep = inSong && offer === 'offer' && (keepChoice ?? target.keepByDefault);
+  /* The row is always there, and only what it says changes: a shape passes
+     through built-in ones on its way to something else (Em, on the way to
+     anything), and a box that came and went would shove the buttons about. */
+  const keepNote =
+    offer === 'builtIn'
+      ? 'This is one of the built-in shapes, so it is already in the library.'
+      : offer === 'mine'
+        ? `Already in My chords${keptAs(findMine(mine, spec, ownId))}.`
+        : inSong
+          ? null
+          : 'Kept in My chords, to use in any song.';
+
   /* Both ways back come through here. Leaving an untouched chord is instant;
      leaving edits asks first, because a shape is fiddly to put back together. */
   const leave = () => {
@@ -132,17 +174,13 @@ export default function ChordEditor({
       .finally(() => setSavingImage(false));
   };
 
-  const where = songTitle ? `Adding to ${songTitle}` : 'Adding a chord';
-
   return (
     <div className="editor">
       <div className="editor-bar">
         <button type="button" className="icon-btn accent" onClick={leave} aria-label="Back">
           <CaretLeft size={20} />
         </button>
-        <span className="editor-context">
-          {chordCount > 0 ? `${where} · ${chordCount} in` : where}
-        </span>
+        <span className="editor-context">{where}</span>
         <button
           type="button"
           className="icon-btn"
@@ -218,6 +256,7 @@ export default function ChordEditor({
           onChange={(e) => setTypedName(e.target.value)}
           placeholder={empty ? '—' : 'Name it'}
           aria-label="Chord name"
+          maxLength={MAX_CHORD_NAME}
           autoComplete="off"
           spellCheck={false}
         />
@@ -252,23 +291,42 @@ export default function ChordEditor({
             );
           })}
           <button type="button" className="chip chip-all" onClick={onBrowseAll}>
-            All 48
+            Browse all
           </button>
         </div>
       </div>
 
-      <div className="editor-action editor-actions">
-        <button type="button" className="btn-secondary btn-block" onClick={leave}>
-          Back
-        </button>
-        <button
-          type="button"
-          className="btn-primary btn-block"
-          disabled={empty || unnamed}
-          onClick={() => onSave({ ...spec, name: name.trim() })}
-        >
-          Save
-        </button>
+      <div className="editor-action">
+        <div className="editor-keep">
+          {keepNote ? (
+            <p role="status">{keepNote}</p>
+          ) : (
+            <label>
+              <input
+                type="checkbox"
+                checked={keep}
+                disabled={offer !== 'offer'}
+                onChange={(e) => setKeepChoice(e.target.checked)}
+              />
+              Keep in My chords
+            </label>
+          )}
+        </div>
+        <div className="editor-actions">
+          <button type="button" className="btn-secondary btn-block" onClick={leave}>
+            Back
+          </button>
+          <button
+            type="button"
+            className="btn-primary btn-block"
+            /* From the Chords tab, saving *is* keeping: what cannot be kept
+               cannot be saved, and the row above has said why. */
+            disabled={empty || unnamed || (!inSong && offer !== 'offer')}
+            onClick={() => onSave({ ...spec, name: name.trim() }, keep)}
+          >
+            Save
+          </button>
+        </div>
       </div>
 
       {confirmingLeave && (

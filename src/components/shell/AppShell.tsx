@@ -18,7 +18,10 @@ interface Props {
       destination or a step inside an editing flow. */
   previous?: Route;
   songs: Song[];
+  /** The few opened last, for the sidebar's "Recent" — the home screen's list. */
+  recent: Song[];
   playlistCount: number;
+  myChordCount: number;
   currentId: string | null;
   onGo: (route: Route) => void;
   onStart: () => void;
@@ -84,7 +87,9 @@ export default function AppShell({
   route,
   previous,
   songs,
+  recent,
   playlistCount,
+  myChordCount,
   currentId,
   onGo,
   onStart,
@@ -103,7 +108,9 @@ export default function AppShell({
           onSignOut={onSignOut}
           route={route}
           songs={songs}
+          recent={recent}
           playlistCount={playlistCount}
+          myChordCount={myChordCount}
           currentId={currentId}
           onGo={onGo}
           onStart={onStart}
@@ -111,7 +118,7 @@ export default function AppShell({
       )}
       <main className="shell-main">{children}</main>
       {chrome === 'tabs' && (
-        <TabBar account={account} route={route} onGo={onGo} onStart={onStart} />
+        <TabBar account={account} route={route} onGo={onGo} />
       )}
     </div>
   );
