@@ -371,6 +371,25 @@ Carried over from the README's "Not built" section — deliberately deferred, no
 
 ## Done
 
+- **The app says which build it is running.** `Version 1.0.0 · 1f5bd8e · 20 Sep 2026`, at the
+  foot of the sidebar and on the account screen — the one screen that is about the app rather
+  than about a song, and the one you get sent to when something is wrong. Both places, because
+  a signed-in desktop user never opens the account screen (the sidebar chip carries its own Out
+  button) and a phone has no sidebar. **The number alone would not have done the job**: a phone
+  holding a cached bundle looks exactly like one on the current release, and a version you have
+  to remember to bump is silent about that. So the commit and the build date are stamped in by
+  `vite.config.ts` and cannot go stale — from `COMMIT_REF` on Netlify, which builds detached, and
+  from `git` locally. `package.json` starts at **1.0.0** and is yours to bump; nothing else needs
+  touching at release. The date is spelled out by hand rather than by `toLocaleDateString`,
+  because it is read out over the phone and matched against a deploy log: ICU renamed en-GB's
+  short September to "Sept" between versions, which is the sort of thing that makes two people
+  think they are on different builds.
+  **Checked 2026-09-20** against a real production build in headless Chrome at 390 px and
+  1280 px: the full line on the account screen, the same line stacked in two on the sidebar,
+  and no page errors. **Not yet checked:** the signed-in account screen (no Firebase credentials
+  in the headless run — it renders the same element as the signed-out one); and a Netlify build,
+  where `COMMIT_REF` rather than `git` supplies the commit.
+
 - **The card's chord row fills its width.** The song card previewed a fixed four shapes, which
   left a wide card three-quarters empty on a song with more. It is now a grid filling however many
   44px slots the width allows, clipping whatever starts a second row (`grid-auto-rows: 0`), capped

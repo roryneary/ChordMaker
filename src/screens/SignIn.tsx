@@ -3,6 +3,7 @@ import { ArrowLeft, CaretRight, GoogleLogo } from '@phosphor-icons/react';
 import { ChordCreatorLockup } from '../components/Brand';
 import type { Account } from '../hooks/useAuth';
 import { SyncLine } from '../components/shell/Sidebar';
+import VersionLine from '../components/VersionLine';
 import type { SyncView } from '../lib/syncStatus';
 import {
   AuthCancelled,
@@ -67,6 +68,12 @@ export default function SignIn({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+
+  /* Which build this is. It lives on the account screen because that is the
+     screen you are told to go to when something is wrong, and it is the one
+     place in the app that is about the app rather than about a song. Not on
+     the handle step: that is mid-errand, and nothing there is about the app. */
+  const version = <VersionLine />;
 
   /* Seeded from the email or Google name, never claimed silently: the handle
      is how they are named to other people, so it is theirs to accept. */
@@ -171,6 +178,7 @@ export default function SignIn({
         >
           {busy ? 'Signing out…' : 'Sign out'}
         </button>
+        {version}
       </div>
     );
   }
@@ -306,6 +314,7 @@ export default function SignIn({
           </button>
         )}
       </div>
+      {version}
     </div>
   );
 }

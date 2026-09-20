@@ -126,6 +126,14 @@ cleared the plate in place was removed because two saves on one screen confused 
 round trip cost. Back (the arrow at the top, or the button beside Save) leaves
 without saving, and asks first if the chord has changed (`chordChanged` in `lib/chordEdits.ts`).
 
+**"Play it" is a named button, because full screen is the point of the app.** On a phone the
+song screen's action bar holds both ways out in words — "Play it", the wider half, and "Share
+or print" beside it. It used to hold only "Looks right", which goes to Ready, with full screen
+hidden behind an unlabelled expand icon halfway up the scroll: a player who opened a song to
+play it had nothing on the screen that said so. Desktop says "Play it" in the same place it
+used to say "Full screen". With no words pasted there is nothing to read full screen, so the
+button is not drawn at all rather than drawn and refused — Ready's rule, applied here.
+
 **Full screen pins the chord shapes above the words.** The strip sits between the bar and
 `.fs-words`, which is the one that scrolls — being outside the scroller is the whole mechanism,
 there is no sticky positioning and nothing measures anything. It rests on `.shell` having a
@@ -256,13 +264,14 @@ read. The reducer refuses both; the screens say why before it comes to that. The
 the same song twice; the add screens do not offer it, because the likelier tap is a mistake, and
 show a song already in the playlist ticked and locked rather than hiding it.
 
-**"Looks right" is a claim, so it is checked before it is accepted.** `Song.capo` has three
+**Calling a song finished is a claim, so it is checked before it is accepted.** `Song.capo` has three
 states, not two: a fret, an explicit `null` meaning "no capo", and **absent** meaning nobody
 has been asked. Defaulting to `null` made the chip read as a settled answer, so players never
 noticed the capo was theirs to set — and a capo moves every chord on the sheet. An unanswered
 capo therefore renders as a dashed "Set the capo", and the song screen will not go through to
 Ready until it has an answer, offered as chips in the check sheet (the chip's own menu is
-absolutely positioned and would be clipped by the sheet's scroll).
+absolutely positioned and would be clipped by the sheet's scroll). The sheet's own confirm
+button is still "Looks right" — in there it is answering a question, not naming a destination.
 
 A song with **no chords** is warned about in that same sheet but let through: words on their
 own are a legitimate thing to print. The check is latched at the moment it opens, so answering
@@ -493,6 +502,18 @@ There is **no Cloud Storage**, deliberately. Everything persisted is small JSON:
 is about 25 kB, and the longest the rules allow under half of Firestore's 1 MiB document limit, and the PNG and PDF are generated in the
 browser at the moment you export them. A stored export would only ever be a stale copy of
 something a second of work regenerates.
+
+**The running build says which one it is**, at the foot of the sidebar and on the account
+screen: `Version 1.0.0 · 1f5bd8e · 20 Sep 2026`. The number is `package.json`'s `version`,
+bumped by hand; the commit and the date are stamped in by `vite.config.ts` through Vite's
+`define`, so they cannot go stale the way a forgotten bump can — which matters because a phone
+holding a cached bundle looks exactly like one on the current release. Netlify builds from a
+detached checkout, so the commit is read from `COMMIT_REF` there and from `git` locally; a
+checkout with neither still builds and simply shows fewer parts (`versionParts` drops what is
+empty). The date is spelled out by hand in `lib/version.ts` rather than by
+`toLocaleDateString`, because this string is read out over the phone and matched against a
+deploy log: the device's locale would render it differently on every phone, and even a pinned
+locale moves — ICU renamed en-GB's short September to "Sept".
 
 One deployment gotcha worth knowing before the first sign-in lands: Firebase Auth checks the
 calling domain against its **Authorized domains** list, and Netlify deploy previews get

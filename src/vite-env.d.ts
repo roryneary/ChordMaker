@@ -20,3 +20,12 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/**
+ * The build stamp, written in by Vite's `define` (see vite.config.ts) and read
+ * through `src/lib/version.ts`. Plain globals rather than `import.meta.env`:
+ * they are facts about the build, not configuration anyone may set.
+ */
+declare const __APP_VERSION__: string;
+declare const __BUILD_COMMIT__: string;
+declare const __BUILD_DATE__: string;

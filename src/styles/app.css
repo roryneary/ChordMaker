@@ -1021,7 +1021,7 @@ h1, h2, h3, h4 {
 /* The song screen puts "Play it" beside "Share or print" in this same row, and
    leans it wider: they are not two equal choices, and the wider half is the one
    you came back to the song to do. */
-.song-play { flex: 1.35 1 0; }
+.editor-actions .song-play { flex: 1.35 1 0; }
 
 @media (min-width: 1024px) {
   .editor-body { max-width: 620px; padding: 12px 40px 0; }
@@ -1529,6 +1529,28 @@ button.word:hover .word-text {
 .signin-hint { margin: 8px 0 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 58%, transparent); }
 /* Errors are a colour and a sentence, never an icon and a code. */
 .signin-error { margin: 8px 0 0; font-size: 13px; color: var(--color-danger); }
+
+/* Which build is running, on the account screen and at the foot of the sidebar.
+   Quiet by a long way — nobody comes looking for it until something is wrong,
+   and then they need to be able to read it out over the phone, which is why it
+   is not shrunk below 12px. Selectable, for the same reason: on a desktop it is
+   quicker to copy it than to say it. */
+.version-line {
+  margin: 18px 0 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  user-select: text;
+}
+.version-line span { white-space: nowrap; }
+
+/* Stacked here, and the separator with it: 234px is not wide enough for the
+   whole line, and letting it wrap on its own left "2026" alone on the second
+   row. */
+.sidebar .version-line { margin: 10px 0 0; line-height: 1.5; }
+.sidebar .version-line span { display: block; }
+.sidebar .version-line .version-dot { display: none; }
 
 .signin-foot {
   display: flex;

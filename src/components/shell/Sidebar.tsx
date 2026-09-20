@@ -10,6 +10,7 @@ import {
 import type { Route } from '../../app/routes';
 import type { Account } from '../../hooks/useAuth';
 import type { SyncView } from '../../lib/syncStatus';
+import VersionLine from '../VersionLine';
 import { ChordCreatorLockup } from '../Brand';
 import type { Song } from '../../types/song';
 import { LIBRARY } from '../../data/chordLibrary';
@@ -207,6 +208,11 @@ export default function Sidebar({
           </span>
         </button>
       )}
+
+      {/* Signed in, the desktop never opens the account screen — the chip above
+          carries its own Out button — so the build has to be readable here too,
+          or half the users could not tell you which one they were on. */}
+      <VersionLine />
     </aside>
   );
 }
