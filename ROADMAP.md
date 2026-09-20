@@ -71,14 +71,15 @@ signing back in as the account they belonged to.
 
 ### 0a. My chords: landed 2026-09-20 — what is left
 
-The feature is in (see Done, and README, "My chords"). **It is not live until the rules are.**
+The feature is in (see Done, and README, "My chords"), **and live since 2026-09-20**: Rory
+deployed the rules and then pushed `41581b0`, in that order, and the Netlify bundle was checked
+to be the new one. The order matters for any later change to these rules too: `firestore.rules`
+gained `validChord` and opened `users/{uid}/chords/{chordId}` to valid creates and updates, and a
+client that writes there before the rules allow it shows every kept chord as a refused save.
 
-**To do first, by hand — Rory:** `firebase deploy --only firestore:rules`. `firestore.rules`
-gained `validChord` and opened `users/{uid}/chords/{chordId}` to valid creates and updates; until
-that is deployed every kept chord is a refused write and the sync line says so. **Do not push the
-client to Netlify before the rules are live.** Deploying early is harmless: the old client never
-writes to that path. Still no Java here, so the rules were reviewed by eye only. Then check — the
-Rules Playground in the console will do the refusals:
+**Still to check by hand.** The rules compiled (a `--dry-run` against the project) and have never
+been exercised: no Java here, so they were reviewed by eye only. The Rules Playground in the
+console will do the refusals:
 - **First, an ordinary song and a playlist still save.** The whole file was redeployed.
 - Keep a chord, signed in, and watch the sync line; the document at `users/{me}/chords/{id}` has
   exactly `id`, `spec`, `createdAt`, `updatedAt`. Rename it (an update). Delete it (the document goes).
