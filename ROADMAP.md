@@ -371,6 +371,28 @@ Carried over from the README's "Not built" section — deliberately deferred, no
 
 ## Done
 
+- **The card's chord row fills its width.** The song card previewed a fixed four shapes, which
+  left a wide card three-quarters empty on a song with more. It is now a grid filling however many
+  44px slots the width allows, clipping whatever starts a second row (`grid-auto-rows: 0`), capped
+  at sixteen so a long song does not build diagrams no card can show. Nothing is hidden by the clip
+  — the sub-line above already says how many chords the song has.
+  **Not yet checked in a browser.**
+
+- **"Play it" is a named button on the song screen.** Full screen was an unlabelled expand icon
+  in the words' label row, halfway up a scroll, and the only thing named on a phone was "Looks
+  right" — which leads to the share-and-print screen. So a player who opened a song to play it had
+  nothing on the screen that said so. The mobile action bar now holds both ways out in words:
+  **"Play it"** (the wider half, in the accent) and **"Share or print"** beside it, and "Looks
+  right" survives only inside the capo check sheet, where it is answering a question rather than
+  naming a destination. Desktop's "Full screen" is renamed to match — one screen, one word for it.
+  With no words pasted there is nothing to read full screen, so the button is not drawn at all and
+  "Share or print" takes the bar on its own; the Ready screen's rule, a row the device cannot
+  honour is not offered and then apologised for.
+  **Checked 2026-09-20** in headless Chrome at 390 px: a fresh song's bar, the bar after words are
+  pasted, and "Play it" reaching full screen with the song's title on it. **Not yet checked:**
+  whether the same problem wants fixing one step earlier — the song list and Home open the builder,
+  never the reading screen (§2 says the same of a playlist).
+
 - **My chords: make, keep and send a chord from the Chords tab.** §0a above has what is left, and
   README, "My chords", has how it works and why. One chord to send to someone used to have to be
   a song; the Chords tab, which was the one tab where nothing could be done, now makes one, keeps
@@ -541,12 +563,13 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   first of a session — right now it is every load, on the grounds that it is short, skippable
   by any key or tap, and briefer still under reduced motion.
 
-- **The capo has to be chosen, and "Looks right" checks before it agrees.** The chip read
+- **The capo has to be chosen, and a check agrees before the song is finished.** The chip read
   "No capo" from the moment a song was created, so it looked like a settled answer rather
   than a question — players did not notice the capo was theirs to set at all, and a capo
   moves every chord on the sheet. `Song.capo` now has a third state: absent, meaning nobody
   has been asked, distinct from an explicit `null`. Unanswered, it renders as a dashed
   "Set the capo", and the song screen will not go through to Ready without an answer.
+  The way in is "Share or print", or desktop's "Print for the stand" / "Send it to someone".
   The same sheet warns about a song with **no chords** but lets it through — words on their
   own are a legitimate thing to print, so that one is a check, not a gate.
   The migration is the quiet part and is already done: `parseSong` keeps a stored `null`
