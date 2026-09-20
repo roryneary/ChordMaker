@@ -5,10 +5,10 @@ import {
   doc,
   getDocs,
   setDoc,
-  writeBatch,
 } from 'firebase/firestore';
 import type { Song } from '../types/song';
 import { getFirebaseDb } from './firebase';
+import { withoutUndefined } from './firestoreData';
 import { parseSong } from './storage';
 
 /**
@@ -17,15 +17,17 @@ import { parseSong } from './storage';
  * chords and placements are always read and written with the song, so a
  * subcollection would buy nothing but partial-write risk.
  *
- * `localStorage` stays the source of truth for the open session — the reducer
- * in `useSongs` neither knows nor cares that a server exists (see
- * `editSong`'s reference-preserving updates, which is what lets the push side
- * below diff cheaply). This module is the seam: it reads what changed and
- * mirrors it, in both directions, around sign-in.
+ * `localStorage` stays the source of truth for the open session. The reducer
+ * in `useSongs` never talks to a server; it only lists the ids it has changed
+ * (`SongStore.unsynced`), and the hook sends those through the calls below and
+ * strikes them off when the account confirms. This module is the seam.
+ *
+ * Every function here rejects on failure and none of them catches: deciding
+ * what a failure means — show it, retry it, keep the id on the list — is the
+ * caller's job, and `useSongs` is the only caller.
  *
  * The merge rule itself (`mergeOnSignIn`) and the cross-account guard live in
- * `accountSync.ts` — `chordSync.ts` needs the identical rule for the loose
- * chord library, and neither cares which kind of record it is moving.
+ * `accountSync.ts`, which does not care which kind of record it is moving.
  */
 
 const songsRef = (uid: string) => collection(getFirebaseDb(), 'users', uid, 'songs');
@@ -36,11 +38,12 @@ const songsRef = (uid: string) => collection(getFirebaseDb(), 'users', uid, 'son
  * the key rather than writing `null`, which already means something else:
  * an explicit "no capo". Getting this wrong would silently answer the
  * question for every song synced before its player chose.
+ *
+ * `withoutUndefined` goes all the way down, because `capo` is no longer the
+ * only one: `shared` and `copiedFrom` are optional too, and
+ * `copiedFrom.display` is optional inside that.
  */
-function toDoc(song: Song): DocumentData {
-  const { capo, ...rest } = song;
-  return capo === undefined ? rest : { ...rest, capo };
-}
+const toDoc = (song: Song): DocumentData => withoutUndefined(song);
 
 export async function writeSong(uid: string, song: Song): Promise<void> {
   await setDoc(doc(songsRef(uid), song.id), toDoc(song));
@@ -60,12 +63,4 @@ export async function fetchRemoteSongs(uid: string): Promise<Song[]> {
     if (song) songs.push(song);
   }
   return songs;
-}
-
-/** One batch, so an interrupted migration cannot leave half a library synced. */
-export async function pushSongs(uid: string, songs: Song[]): Promise<void> {
-  if (!songs.length) return;
-  const batch = writeBatch(getFirebaseDb());
-  for (const song of songs) batch.set(doc(songsRef(uid), song.id), toDoc(song));
-  await batch.commit();
 }

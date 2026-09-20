@@ -1,22 +1,30 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
-  ArrowDown,
   ArrowRight,
+  ArrowsClockwise,
   ArrowsOutSimple,
   CaretLeft,
-  Lightbulb,
+  CopySimple,
   PaperPlaneTilt,
   PencilSimple,
   Plus,
   Printer,
+  Swap,
+  Trash,
   Warning,
 } from '@phosphor-icons/react';
 import CapoChip, { CAPO_FRETS, capoChosen, capoLabel } from '../components/CapoChip';
 import ChordDiagram from '../components/ChordDiagram';
+import DeleteSongSheet from '../components/DeleteSongSheet';
+import SavedLine from '../components/SavedLine';
 import LyricBlock from '../components/lyric/LyricBlock';
 import { useIsDesktop } from '../components/shell/useBreakpoint';
 import { ordinal } from '../lib/numerals';
-import { groupByLine, lineCount, unchordedLineCount } from '../lib/lyric';
+import { lineCount, unchordedLineCount } from '../lib/lyric';
+import type { Membership } from '../lib/playlists';
+import { MAX_TITLE_CHARS, changedSinceShared, senderLabel } from '../lib/sharedSong';
+import type { SyncView } from '../lib/syncStatus';
+import type { SharedSong } from '../types/sharedSong';
 import type { SavedChord, Song } from '../types/song';
 
 interface Props {
@@ -31,9 +39,20 @@ interface Props {
   onCapo: (capo: number | null) => void;
   onPlace: (wordId: string, chordId: string | null) => void;
   onTitle: (title: string) => void;
+  /** The sender's newer version of this song, when there is one to offer. */
+  update: SharedSong | null;
+  /** The two answers to it. There is no third, blended one: see lib/sharedSong.ts. */
+  onReplaceMine: (update: SharedSong) => void;
+  onKeepMine: (update: SharedSong) => void;
+  /** For a song of the player's own that is shared and has changed since. */
+  sharing: { busy: boolean; error: string | null; onShareChanges: () => void };
+  /** Whether the song is really kept — said here, not only on the account chip. */
+  sync: SyncView;
+  /** The playlists this song is in — what the delete sheet says it will leave. */
+  memberships: Membership[];
+  /** Deletes the song, after its sheet has said what that reaches. */
+  onDelete: () => void;
 }
-
-const SHOWN_LINES = 3;
 
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 const spell = (n: number) => COUNT_WORDS[n] ?? String(n);
@@ -55,9 +74,18 @@ export default function SongScreen({
   onCapo,
   onPlace,
   onTitle,
+  update,
+  onReplaceMine,
+  onKeepMine,
+  sharing,
+  sync,
+  memberships,
+  onDelete,
 }: Props) {
   const isDesktop = useIsDesktop();
   const [picking, setPicking] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deciding, setDeciding] = useState(false);
   /**
    * Latched at the moment the check opens, not read live: choosing the capo
    * inside the sheet would otherwise pull the question out from under the
@@ -66,11 +94,13 @@ export default function SongScreen({
   const [checking, setChecking] = useState<{ capo: boolean; chords: boolean } | null>(null);
 
   const lines = lineCount(song.lyric);
-  const grouped = useMemo(() => groupByLine(song.words, lines), [song.words, lines]);
-  const remaining = Math.max(0, grouped.filter((l) => l.length > 0).length - SHOWN_LINES);
   const toChord = unchordedLineCount(song.words, song.placements, lines);
   const meta = [song.key && `Key of ${song.key}`, song.feel].filter(Boolean).join(' · ');
   const hasLyric = song.lyric.trim().length > 0;
+  /* A song with nothing in it yet has just been made, and the first thing it
+     needs is a name. autoFocus only acts at mount, which is exactly then — and
+     it is what lets "Just the chords" go name, capo, Add without a wasted tap. */
+  const fresh = !song.title.trim() && song.chords.length === 0 && !hasLyric;
 
   /**
    * "Looks right" is a claim about a finished song, so the two things it can be
@@ -116,12 +146,16 @@ export default function SongScreen({
     </li>
   );
 
-  const footText = () => {
-    if (remaining > 0) return `${Spell(remaining)} more line${remaining === 1 ? '' : 's'} below`;
-    if (toChord > 0) return `${Spell(toChord)} line${toChord === 1 ? '' : 's'} with no chords yet`;
-    return 'Every line has a chord';
-  };
+  const footText = () =>
+    toChord > 0
+      ? `${Spell(toChord)} line${toChord === 1 ? '' : 's'} with no chords yet`
+      : 'Every line has a chord';
 
+  /* Every line, not a preview of the first few. This is the only screen where
+     a chord is dropped on a word, so a line that is not drawn here is a line
+     that can never be chorded. It used to stop after three and say "33 more
+     lines below", of lines it had not rendered; `.song-body` scrolls, so there
+     was never a reason to hold them back. */
   const wordsBlock = (
     <div className="words-block">
       {hasLyric ? (
@@ -132,15 +166,11 @@ export default function SongScreen({
             placements={song.placements}
             nameOf={nameOf}
             sizes={isDesktop ? { word: 17, chord: 12.5 } : { word: 16, chord: 11.5 }}
-            maxLines={SHOWN_LINES}
             onWordClick={song.chords.length ? setPicking : undefined}
             selectedWordId={picking}
           />
           <p className="words-block-foot">
-            <span>
-              {isDesktop && <ArrowDown size={14} />}
-              {footText()}
-            </span>
+            <span>{footText()}</span>
             {!isDesktop && (
               <button type="button" className="btn-ghost" onClick={onEditWords}>
                 Edit the words
@@ -189,6 +219,121 @@ export default function SongScreen({
         </button>
       </div>
     </>
+  );
+
+  /**
+   * One line about where this song stands with other people, and nothing at all
+   * for a song that has never left: whose it was, whether they have changed
+   * theirs since; or that it is shared, and whether the link is behind.
+   *
+   * The words are chosen to keep "version" out of it. Nobody thinks of a song
+   * as having versions — it has been changed, or it has not.
+   */
+  const from = song.copiedFrom ? senderLabel(song.copiedFrom) : null;
+  const status = (from || song.shared) && (
+    <p className="song-status">
+      {from && !update && <span>from {from}</span>}
+      {from && update && (
+        <>
+          <ArrowsClockwise size={14} />
+          <span>{from} has changed this song</span>
+          <button type="button" className="btn-ghost" onClick={() => setDeciding(true)}>
+            Get the new one
+          </button>
+        </>
+      )}
+      {song.shared && !changedSinceShared(song) && <span>Shared</span>}
+      {song.shared && changedSinceShared(song) && (
+        <>
+          <ArrowsClockwise size={14} />
+          <span>You&apos;ve changed this since you shared it</span>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={sharing.busy}
+            onClick={sharing.onShareChanges}
+          >
+            {sharing.busy ? 'Sharing…' : 'Share the changes'}
+          </button>
+        </>
+      )}
+      {sharing.error && <span className="is-error" role="alert">{sharing.error}</span>}
+    </p>
+  );
+
+  /**
+   * Always asked, never assumed — even for a copy that has not been touched.
+   * There is no merge to offer: the two copies' words carry different ids
+   * (`retokenise`), so it is theirs or mine, and only the player can say which.
+   */
+  const decide = deciding && update && (
+    <>
+      <button
+        type="button"
+        className="scrim"
+        aria-label="Close"
+        onClick={() => setDeciding(false)}
+      />
+      <div className="sheet" role="dialog" aria-label="The sender has changed this song">
+        <i className="grab" />
+        <h2>{from} has changed this song</h2>
+        <button
+          type="button"
+          className="share-row"
+          onClick={() => {
+            setDeciding(false);
+            onReplaceMine(update);
+          }}
+        >
+          <Swap size={22} />
+          <span>
+            <strong>Replace mine</strong>
+            <em>This song becomes their new one. Anything you changed in it is lost.</em>
+          </span>
+        </button>
+        <button
+          type="button"
+          className="share-row"
+          onClick={() => {
+            setDeciding(false);
+            onKeepMine(update);
+          }}
+        >
+          <CopySimple size={22} />
+          <span>
+            <strong>Keep mine, and add the new one</strong>
+            <em>Yours stays exactly as it is, and stops asking. Theirs arrives as a second song.</em>
+          </span>
+        </button>
+        <button type="button" className="btn-ghost btn-block" onClick={() => setDeciding(false)}>
+          Not now
+        </button>
+      </div>
+    </>
+  );
+
+  /* Last thing on the screen, and quiet: it is the one action here with no
+     undo, so it is out of the way of everything you come here to do. It was
+     only on the Songs list, which is not where you are when you decide a song
+     was a mistake. The sheet is the same one, and says what the delete reaches.
+     It stays open until the song is gone — a shared song's delete can be
+     refused, and then it has to say why. */
+  const deleteRow = (
+    <button type="button" className="btn-ghost song-delete" onClick={() => setDeleting(true)}>
+      <Trash size={15} />
+      Delete this song
+    </button>
+  );
+
+  const deleteSheet = deleting && (
+    <DeleteSongSheet
+      song={song}
+      memberships={memberships}
+      busy={sharing.busy}
+      error={sharing.error}
+      onDelete={onDelete}
+      onClose={() => setDeleting(false)}
+    />
   );
 
   /**
@@ -294,6 +439,8 @@ export default function SongScreen({
               className="title-input display-md"
               value={song.title}
               onChange={(e) => onTitle(e.target.value)}
+              autoFocus={fresh}
+              maxLength={MAX_TITLE_CHARS}
               placeholder="Name this song"
               aria-label="Song title"
               autoComplete="off"
@@ -313,7 +460,10 @@ export default function SongScreen({
           <div className="song-meta">
             {meta && <span>{meta}</span>}
             <CapoChip capo={song.capo} onChange={onCapo} />
+            <span className="spacer" />
+            <SavedLine sync={sync} />
           </div>
+          {status}
           <hr className="rule rule-flush" />
         </header>
 
@@ -346,24 +496,12 @@ export default function SongScreen({
             </button>
           </div>
           {wordsBlock}
-
-          {/* The direction's signature: an opinionated line that teaches when
-              you stall. Desktop only — mobile gave the space to the words. */}
-          {song.chords.length >= 4 && song.chords.length < 6 && (
-            <div className="nudge">
-              <Lightbulb size={18} />
-              <p>
-                {Spell(song.chords.length)} chords — that&apos;s a whole song. Add another if
-                you want a turnaround at the end.
-              </p>
-              <button type="button" className="btn-ghost" onClick={onAddChord}>
-                Add one
-              </button>
-            </div>
-          )}
+          {deleteRow}
         </div>
         {picker}
         {check}
+        {decide}
+        {deleteSheet}
       </div>
     );
   }
@@ -379,17 +517,24 @@ export default function SongScreen({
             className="title-input"
             value={song.title}
             onChange={(e) => onTitle(e.target.value)}
+            autoFocus={fresh}
+            maxLength={MAX_TITLE_CHARS}
             placeholder="Name this song"
             aria-label="Song title"
             autoComplete="off"
             spellCheck={false}
           />
-          {meta && <em>{meta}</em>}
+          <span className="song-titles-sub">
+            {meta && <em>{meta}</em>}
+            {meta && <i className="divider-dot" />}
+            <SavedLine sync={sync} />
+          </span>
         </span>
       </header>
 
       <div className="song-body">
         <CapoChip capo={song.capo} onChange={onCapo} />
+        {status}
 
         <div className="label-row">
           <h2>The chords</h2>
@@ -415,6 +560,7 @@ export default function SongScreen({
           </button>
         </div>
         {wordsBlock}
+        {deleteRow}
       </div>
 
       <div className="editor-action">
@@ -425,6 +571,8 @@ export default function SongScreen({
       </div>
       {picker}
       {check}
+      {decide}
+      {deleteSheet}
     </div>
   );
 }

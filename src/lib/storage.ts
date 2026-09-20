@@ -1,7 +1,9 @@
 import type { ChordSpec } from '../types/chord';
-import type { Placements, SavedChord, Song, Word } from '../types/song';
+import type { CopiedFrom, Placements, SavedChord, SharedRef, Song, Word } from '../types/song';
+import type { Playlist } from '../types/playlist';
 import { newId } from './id';
 import { clampRootFret } from './layout';
+import { parsePlaylist } from './playlists';
 
 /**
  * The song store: many songs keyed by id, plus a pointer at the open one.
@@ -14,21 +16,63 @@ import { clampRootFret } from './layout';
 export const STORAGE_KEY = 'chord-builder:songs:v2';
 /** The single-song key this replaces. Read once, on migration; never written. */
 export const LEGACY_KEY = 'chord-builder:song:v1';
-/** Chords the user built and kept, merged over the built-in library. */
+/**
+ * The retired loose-chord library: shapes built with "Just one chord" and no
+ * song open. Nothing ever read it back, so it was a second place for work to
+ * go and never be seen again. Read once, folded into a song, then removed —
+ * see `looseChordsToSong`.
+ */
 export const USER_CHORDS_KEY = 'chord-builder:chords:v1';
+/** The title the folded shapes are kept under, so the player can see where they went. */
+export const LOOSE_CHORDS_TITLE = 'Loose chords';
 
 export interface SongStore {
   songs: Song[];
   currentId: string | null;
+  /**
+   * Ids changed on this device and not yet confirmed by the account: created,
+   * edited, or — when no song here carries the id any more — deleted.
+   *
+   * It lives in the store, not in the sync hook, for two reasons. It has to
+   * survive a reload: an edit made with no signal is still unsaved tomorrow,
+   * and the sign-in merge needs to know that or "remote wins" reverts it. And
+   * the reducer is the only place that can record a change atomically with
+   * making it — an effect marking ids after the render leaves a gap the merge
+   * can land in. It says nothing about a server; signed out it simply grows to
+   * "every song", which is exactly what a first sign-in has to push.
+   */
+  unsynced: string[];
+  /**
+   * Playlists live in the song store rather than one of their own, because
+   * deleting a song has to take it out of every playlist in the same step — a
+   * second store could only follow the first, and a reload between the two
+   * would leave a playlist pointing at nothing.
+   */
+  playlists: Playlist[];
+  /** `unsynced`, for playlists. Separate because an id with nothing behind it
+      means "deleted", and the sync has to know from which collection. */
+  unsyncedPlaylists: string[];
 }
 
 interface StoredV2 {
   v: 2;
   songs: Song[];
   currentId: string | null;
+  /** Absent in stores saved before it existed, which reads as "all confirmed". */
+  unsynced?: string[];
+  /** Both absent in stores saved before playlists: no playlists, nothing to confirm.
+      No version bump — the `capo` precedent, an absent key that already means something. */
+  playlists?: Playlist[];
+  unsyncedPlaylists?: string[];
 }
 
-export const emptyStore = (): SongStore => ({ songs: [], currentId: null });
+export const emptyStore = (): SongStore => ({
+  songs: [],
+  currentId: null,
+  unsynced: [],
+  playlists: [],
+  unsyncedPlaylists: [],
+});
 
 export function newSong(title = ''): Song {
   const now = Date.now();
@@ -78,8 +122,7 @@ const withValidRootFret = (c: SavedChord): SavedChord => {
   return rootFret === c.spec.rootFret ? c : { ...c, spec: { ...c.spec, rootFret } };
 };
 
-/** A single chord from an untrusted source — the sibling of `parseSong`,
-    and what Firestore documents in `chordSync.ts` are read through. */
+/** A single chord from an untrusted source — the sibling of `parseSong`. */
 export function parseSavedChord(x: unknown): SavedChord | null {
   return isSavedChord(x) ? withValidRootFret(x) : null;
 }
@@ -105,12 +148,53 @@ function parsePlacements(x: unknown): Placements {
 
 const str = (x: unknown, fallback = ''): string => (typeof x === 'string' ? x : fallback);
 
+/* Both of these come back `undefined` for anything short of a whole record. A
+   half-read one is worse than none: a `shared` with no id would show a song as
+   shared with no link to send, and a `copiedFrom` with no uid names nobody. */
+
+function parseSharedRef(x: unknown): SharedRef | undefined {
+  if (typeof x !== 'object' || x === null) return undefined;
+  const raw = x as Partial<SharedRef>;
+  if (typeof raw.shareId !== 'string' || typeof raw.version !== 'number') return undefined;
+  return {
+    shareId: raw.shareId,
+    version: raw.version,
+    // Unknown reads as "changed since", which costs one needless tap; the
+    // other way round would hide a real change.
+    at: typeof raw.at === 'number' ? raw.at : 0,
+    listed: raw.listed === true,
+  };
+}
+
+function parseCopiedFrom(x: unknown): CopiedFrom | undefined {
+  if (typeof x !== 'object' || x === null) return undefined;
+  const raw = x as Partial<CopiedFrom>;
+  if (
+    typeof raw.shareId !== 'string' ||
+    typeof raw.version !== 'number' ||
+    typeof raw.uid !== 'string' ||
+    typeof raw.handle !== 'string'
+  ) {
+    return undefined;
+  }
+  return {
+    shareId: raw.shareId,
+    version: raw.version,
+    uid: raw.uid,
+    handle: raw.handle,
+    ...(typeof raw.display === 'string' ? { display: raw.display } : {}),
+    ...(raw.follows === false ? { follows: false as const } : {}),
+  };
+}
+
 export function parseSong(x: unknown): Song | null {
   if (typeof x !== 'object' || x === null) return null;
   const raw = x as Partial<Song>;
   if (typeof raw.id !== 'string') return null;
 
   const now = Date.now();
+  const shared = parseSharedRef(raw.shared);
+  const copiedFrom = parseCopiedFrom(raw.copiedFrom);
   return {
     id: raw.id,
     title: str(raw.title),
@@ -123,13 +207,23 @@ export function parseSong(x: unknown): Song | null {
     lyric: str(raw.lyric),
     words: Array.isArray(raw.words) ? raw.words.filter(isWord) : [],
     placements: parsePlacements(raw.placements),
+    // Left off entirely when absent, like `capo`: absent is the state.
+    ...(shared ? { shared } : {}),
+    ...(copiedFrom ? { copiedFrom } : {}),
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : now,
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : now,
   };
 }
 
 export function serializeStore(store: SongStore): string {
-  const stored: StoredV2 = { v: 2, songs: store.songs, currentId: store.currentId };
+  const stored: StoredV2 = {
+    v: 2,
+    songs: store.songs,
+    currentId: store.currentId,
+    unsynced: store.unsynced,
+    playlists: store.playlists,
+    unsyncedPlaylists: store.unsyncedPlaylists,
+  };
   return JSON.stringify(stored);
 }
 
@@ -143,7 +237,18 @@ export function parseStore(raw: string | null): SongStore | null {
       typeof data.currentId === 'string' && songs.some((s) => s.id === data.currentId)
         ? data.currentId
         : (songs[0]?.id ?? null);
-    return { songs, currentId };
+    const ids = (x: unknown): string[] =>
+      Array.isArray(x) ? x.filter((id): id is string => typeof id === 'string') : [];
+    const playlists = Array.isArray(data.playlists)
+      ? data.playlists.map(parsePlaylist).filter((p): p is Playlist => p !== null)
+      : [];
+    return {
+      songs,
+      currentId,
+      unsynced: ids(data.unsynced),
+      playlists,
+      unsyncedPlaylists: ids(data.unsyncedPlaylists),
+    };
   } catch {
     return null;
   }
@@ -174,24 +279,78 @@ export function migrateV1(raw: string | null): SongStore | null {
     if (!chords.length && !data.title.trim()) return null; // nothing worth keeping
 
     const song: Song = { ...newSong(data.title), chords };
-    return { songs: [song], currentId: song.id };
+    return { ...emptyStore(), songs: [song], currentId: song.id, unsynced: [song.id] };
   } catch {
     return null;
   }
 }
 
+/* --- Folding in the loose chords ----------------------------------------- */
+
+/**
+ * The loose chords as one song, or null if there is nothing worth keeping.
+ * Everything is a song now, and these were somebody's work, so they become one
+ * rather than being dropped with the store that held them. Chords keep their
+ * ids. The capo starts unanswered, for the reason `migrateV1` gives.
+ */
+export function looseChordsToSong(raw: string | null): Song | null {
+  if (!raw) return null;
+  try {
+    const chords = parseSavedChords(JSON.parse(raw) as unknown);
+    if (!chords.length) return null;
+    return { ...newSong(LOOSE_CHORDS_TITLE), chords };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Puts the folded song at the top of the library, where it will be seen. It
+ * does not steal the open song: it is present, not open. It is new to the
+ * account, so it is listed as unconfirmed like any other new song.
+ */
+export function adoptLooseChords(store: SongStore, song: Song): SongStore {
+  return {
+    ...store,
+    songs: [song, ...store.songs],
+    currentId: store.currentId ?? song.id,
+    unsynced: [...store.unsynced, song.id],
+  };
+}
+
 /* --- Browser storage ----------------------------------------------------- */
+
+function loadSongs(): SongStore {
+  const existing = parseStore(window.localStorage.getItem(STORAGE_KEY));
+  if (existing) return existing;
+
+  const migrated = migrateV1(window.localStorage.getItem(LEGACY_KEY));
+  if (migrated) {
+    saveStore(migrated); // so the migration only runs once
+    return migrated;
+  }
+  return emptyStore();
+}
 
 export function loadStore(): SongStore {
   try {
-    const existing = parseStore(window.localStorage.getItem(STORAGE_KEY));
-    if (existing) return existing;
+    let store = loadSongs();
 
-    const migrated = migrateV1(window.localStorage.getItem(LEGACY_KEY));
-    if (migrated) {
-      saveStore(migrated); // so the migration only runs once
-      return migrated;
+    const rawLoose = window.localStorage.getItem(USER_CHORDS_KEY);
+    if (rawLoose !== null) {
+      const loose = looseChordsToSong(rawLoose);
+      if (loose) {
+        store = adoptLooseChords(store, loose);
+        saveStore(store);
+      }
+      /* Removed, unlike LEGACY_KEY, which is left for a downgrade to find:
+         the code that read this key is gone, so nothing could find it again —
+         and leaving it would fold the same chords into a new song every load.
+         Removed even when it held "[]", which the old hook wrote on every
+         start whether or not a chord had ever been saved. */
+      window.localStorage.removeItem(USER_CHORDS_KEY);
     }
+    return store;
   } catch {
     // Fall through to an empty library.
   }
@@ -203,25 +362,5 @@ export function saveStore(store: SongStore): void {
     window.localStorage.setItem(STORAGE_KEY, serializeStore(store));
   } catch {
     // Private mode or a full quota: the session still works, it just won't persist.
-  }
-}
-
-/* --- The user's own chords ----------------------------------------------- */
-
-export function loadUserChords(): SavedChord[] {
-  try {
-    const raw = window.localStorage.getItem(USER_CHORDS_KEY);
-    if (!raw) return [];
-    return parseSavedChords(JSON.parse(raw) as unknown);
-  } catch {
-    return [];
-  }
-}
-
-export function saveUserChords(chords: SavedChord[]): void {
-  try {
-    window.localStorage.setItem(USER_CHORDS_KEY, JSON.stringify(chords));
-  } catch {
-    // As above.
   }
 }

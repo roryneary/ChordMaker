@@ -1,26 +1,107 @@
 rules_version = '2';
 
 /*
- * Two collections, and the split between them is the whole design.
+ * Four places, and the split between them is the whole design.
  *
- * A user's songs live under their own uid, so the path is the owner of record
- * and the rule is one line — see ROADMAP.md §1. Usernames cannot live there:
- * a handle has to be unique across everyone, and Firestore has no unique
- * constraint, so the claim is a document whose ID *is* the handle. A document
- * id can only exist once, which is the constraint, and `create` on an existing
- * path fails — so two people racing for the same name, one loses cleanly.
+ * A user's songs and playlists live under their own uid, so the path is the
+ * owner of record — see ROADMAP.md §1. Nobody else is ever let in there, for
+ * any reason: that one fact is what makes an unshared song private, and it is
+ * why sharing a song *copies it out* to `shared` instead of opening it up.
+ *
+ * Usernames cannot live under a uid: a handle has to be unique across
+ * everyone, and Firestore has no unique constraint, so the claim is a document
+ * whose ID *is* the handle. A document id can only exist once, which is the
+ * constraint, and `create` on an existing path fails — so two people racing
+ * for the same name, one loses cleanly.
+ *
+ * Anything not named here is refused. There used to be a wildcard under
+ * `users/{uid}`, which let a signed-in user keep any data of any shape under
+ * their own uid on this project's bill. The price of naming things is that
+ * THESE FIELD LISTS MUST BE KEPT IN STEP with `src/types/song.ts` and
+ * `src/types/playlist.ts`: add a field there and not here, and every save of
+ * every song is refused. The app says so (lib/syncStatus.ts), but only once it
+ * has happened.
  */
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Everything a signed-in user owns. Nobody else reads it.
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // The caller really holds this handle: nobody publishes as someone else.
+    function holdsHandle(handle) {
+      return handle is string
+        && get(/databases/$(database)/documents/usernames/$(handle)).data.uid == request.auth.uid;
+    }
+
+    /*
+     * How big a song may be. The rule is four times the longest real song:
+     * Bat Out of Hell runs to about 4,500 characters, so 20,000. The word list
+     * is what fills a document (each word carries a 36-character id); at these
+     * limits a song is still under half of the 1 MiB a document may be.
+     * `src/lib/sharedSong.ts` holds the same numbers so the app can say "too
+     * long" before this does.
+     */
+    function validMusic(s) {
+      return s.title is string && s.title.size() <= 200
+        && s.key is string && s.key.size() <= 100
+        && s.feel is string && s.feel.size() <= 100
+        && (!('capo' in s) || s.capo == null || s.capo is number)
+        && s.chords is list && s.chords.size() <= 100
+        && s.lyric is string && s.lyric.size() <= 20000
+        && s.words is list && s.words.size() <= 5000
+        && s.placements is map && s.placements.size() <= 5000;
+    }
+
+    function validSong(s, songId) {
+      return s.keys().hasOnly(['id', 'title', 'key', 'feel', 'capo', 'chords', 'lyric', 'words',
+                               'placements', 'shared', 'copiedFrom', 'createdAt', 'updatedAt'])
+        && s.id == songId
+        && validMusic(s)
+        && (!('shared' in s) || s.shared is map)
+        && (!('copiedFrom' in s) || s.copiedFrom is map)
+        && s.createdAt is number && s.updatedAt is number;
+    }
+
+    function validPlaylist(p, playlistId) {
+      return p.keys().hasOnly(['id', 'name', 'items', 'createdAt', 'updatedAt'])
+        && p.id == playlistId
+        && p.name is string && p.name.size() <= 200
+        && p.items is list && p.items.size() <= 1000
+        && p.createdAt is number && p.updatedAt is number;
+    }
+
+    // The profile: the claimed handle, written by `claimUsername`.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+                    && request.resource.data.keys().hasOnly(['handle', 'display', 'updatedAt'])
+                    && request.resource.data.handle is string
+                    && request.resource.data.handle.size() <= 24
+                    && request.resource.data.display is string
+                    && request.resource.data.display.size() <= 24;
+
+      match /songs/{songId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validSong(request.resource.data, songId);
+      }
+
+      match /playlists/{playlistId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validPlaylist(request.resource.data, playlistId);
+      }
+
+      // The retired loose-chord store (README, "Screens"). What is there can
+      // be read and cleared by its owner; nothing new goes in.
+      match /chords/{chordId} {
+        allow read, delete: if isOwner(uid);
+      }
     }
 
     match /usernames/{handle} {
       // Readable by anyone signed in: this is the availability check, and
-      // later the lookup that turns a handle into a uid when sharing.
+      // the lookup that turns a handle into a uid.
       allow read: if request.auth != null;
 
       // Claim only what is free, only for yourself, and only a handle that
@@ -38,6 +119,93 @@ service cloud.firestore {
       // and a fresh claim, so the id and the uid inside it can never disagree.
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
       allow update: if false;
+    }
+
+    /*
+     * A shared song: a copy its owner put where others can reach it.
+     *
+     * `get` is open to anyone, signed in or not — the id is an unguessable
+     * UUID and the link carrying it is the key, so a bandmate can open a song
+     * without an account. `list` is closed to everyone: there is no way to
+     * find a shared song except to be handed its link, or for its owner to
+     * have put a card for it in `sharedIndex` below. Unlisted, then, not
+     * private — anyone given the link can read it, until the owner deletes it.
+     */
+    match /shared/{shareId} {
+      function validShared(d) {
+        return d.keys().hasOnly(['ownerUid', 'handle', 'display', 'songId', 'version', 'song',
+                                 'publishedAt', 'updatedAt'])
+          && d.ownerUid == request.auth.uid
+          && holdsHandle(d.handle)
+          && d.display is string && d.display.size() <= 24
+          && d.songId is string
+          && d.version is int
+          && d.song is map
+          && d.song.keys().hasOnly(['title', 'key', 'feel', 'capo', 'chords', 'lyric', 'words',
+                                    'placements'])
+          && validMusic(d.song)
+          && d.publishedAt is number && d.updatedAt is number;
+      }
+
+      allow get: if true;
+      allow list: if false;
+
+      allow create: if request.auth != null
+                    && validShared(request.resource.data)
+                    && request.resource.data.version == 1;
+
+      // Its owner's, for good; and the version only ever steps forward by one,
+      // because a recipient is told of changes by comparing it.
+      allow update: if request.auth != null
+                    && resource.data.ownerUid == request.auth.uid
+                    && validShared(request.resource.data)
+                    && request.resource.data.songId == resource.data.songId
+                    && request.resource.data.publishedAt == resource.data.publishedAt
+                    && (request.resource.data.version == resource.data.version
+                        || request.resource.data.version == resource.data.version + 1);
+
+      // Deleting one that is already gone is allowed, as it is for its card
+      // below. "Stop sharing" and deleting a song both sweep this, and the
+      // owner may already have stopped from another device: refusing that
+      // would leave a song that could not be deleted because its link was
+      // *already* down.
+      allow delete: if request.auth != null
+                    && (resource == null || resource.data.ownerUid == request.auth.uid);
+    }
+
+    /*
+     * The browsable library: one small card per *listed* shared song, under
+     * the same id. Signed-in only. A card is written in the same batch as the
+     * song it stands for, hence `getAfter` — it can only exist for a shared
+     * song its writer owns, and only under the name that song carries.
+     */
+    match /sharedIndex/{shareId} {
+      function sharedAfter() {
+        return getAfter(/databases/$(database)/documents/shared/$(shareId)).data;
+      }
+
+      allow read: if request.auth != null;
+
+      allow create, update: if request.auth != null
+                    && request.resource.data.keys().hasOnly(['ownerUid', 'handle', 'display',
+                         'title', 'titleLower', 'chordCount', 'firstChords', 'updatedAt'])
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && sharedAfter().ownerUid == request.auth.uid
+                    && request.resource.data.handle == sharedAfter().handle
+                    && request.resource.data.display == sharedAfter().display
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() <= 200
+                    && request.resource.data.titleLower is string
+                    && request.resource.data.titleLower.size() <= 200
+                    && request.resource.data.chordCount is int
+                    && request.resource.data.firstChords is list
+                    && request.resource.data.firstChords.size() <= 4
+                    && request.resource.data.updatedAt is number;
+
+      // Deleting a card that is not there is allowed, so "stop sharing" can
+      // always sweep both documents without first asking whether it was listed.
+      allow delete: if request.auth != null
+                    && (resource == null || resource.data.ownerUid == request.auth.uid);
     }
   }
 }

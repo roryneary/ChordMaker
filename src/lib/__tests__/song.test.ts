@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LOOSE_CHORDS_TITLE,
+  adoptLooseChords,
   emptyStore,
+  looseChordsToSong,
   migrateV1,
   newSong,
   parseStore,
@@ -71,6 +74,129 @@ describe('the store', () => {
     const parsed = parseStore(serializeStore(withChord));
     expect(parsed?.songs[0].chords).toHaveLength(1);
     expect(parsed?.songs[0].chords[0].spec.rootFret).toBe(MAX_ROOT_FRET);
+  });
+});
+
+/**
+ * The list of ids the account has not confirmed. It is kept by the reducer so
+ * that recording a change is atomic with making it, and it is what stops an
+ * edit made with no signal being reverted by "remote wins" at the next load.
+ */
+describe('what the account has not confirmed', () => {
+  it('lists a song from the moment it is created, and once only', () => {
+    const { store, id } = storeWithSong();
+    expect(store.unsynced).toEqual([id]);
+
+    const edited = songsReducer(store, { type: 'SET_TITLE', id, title: 'Harbour Lights II' });
+    expect(edited.unsynced).toEqual([id]);
+  });
+
+  it('is cleared by the confirmation of the version that was sent', () => {
+    const { store, id } = storeWithSong();
+    const sent = store.songs[0].updatedAt;
+    const confirmed = songsReducer(store, { type: 'SYNCED', id, updatedAt: sent });
+    expect(confirmed.unsynced).toEqual([]);
+    // And it survives the trip through storage either way.
+    expect(parseStore(serializeStore(store))!.unsynced).toEqual([id]);
+    expect(parseStore(serializeStore(confirmed))!.unsynced).toEqual([]);
+  });
+
+  it('stays listed when the song was edited while that write was in flight', () => {
+    const { store, id } = storeWithSong();
+    const sent = store.songs[0].updatedAt;
+    const editedMeanwhile = songsReducer(store, { type: 'SET_TITLE', id, title: 'Newer' });
+    // Same millisecond or not, the stamp has moved on.
+    expect(editedMeanwhile.songs[0].updatedAt).toBeGreaterThan(sent);
+
+    const after = songsReducer(editedMeanwhile, { type: 'SYNCED', id, updatedAt: sent });
+    expect(after).toBe(editedMeanwhile);
+    expect(after.unsynced).toEqual([id]);
+  });
+
+  it('keeps a deleted song listed until the account confirms the delete', () => {
+    const { store, id } = storeWithSong();
+    const synced = songsReducer(store, { type: 'SYNCED', id, updatedAt: store.songs[0].updatedAt });
+    const deleted = songsReducer(synced, { type: 'DELETE_SONG', id });
+    expect(deleted.songs).toEqual([]);
+    expect(deleted.unsynced).toEqual([id]);
+
+    // A write confirmation for it is not the delete's confirmation.
+    expect(songsReducer(deleted, { type: 'SYNCED', id, updatedAt: 123 }).unsynced).toEqual([id]);
+    expect(songsReducer(deleted, { type: 'SYNCED', id, updatedAt: null }).unsynced).toEqual([]);
+  });
+
+  it('reads a store saved before the list existed as fully confirmed', () => {
+    const { store } = storeWithSong();
+    const raw = JSON.parse(serializeStore(store)) as { unsynced?: unknown };
+    delete raw.unsynced;
+    expect(parseStore(JSON.stringify(raw))!.unsynced).toEqual([]);
+  });
+});
+
+describe("the account's library arriving", () => {
+  it('merges against the store as it is now, keeping a song made while it was loading', () => {
+    const remote = newSong('From the account');
+    const { store, id } = storeWithSong(); // made a moment before the fetch returned
+
+    const after = songsReducer(store, { type: 'HYDRATE', remote: [remote], allowPush: true });
+    expect(after.songs.map((s) => s.id).sort()).toEqual([remote.id, id].sort());
+    // The new one still has to go up; the account's own copy does not.
+    expect(after.unsynced).toEqual([id]);
+  });
+
+  it("keeps an edit the account never confirmed, and takes the account's copy otherwise", () => {
+    let store = storeWithSong().store;
+    const id = store.currentId!;
+    const remoteCopy = { ...store.songs[0], title: 'Older copy on the account' };
+
+    // Unconfirmed: local wins and stays listed.
+    let after = songsReducer(store, { type: 'HYDRATE', remote: [remoteCopy], allowPush: true });
+    expect(after.songs[0].title).toBe('Harbour Lights');
+    expect(after.unsynced).toEqual([id]);
+
+    // Confirmed: nothing local to protect, so the account's copy wins.
+    store = songsReducer(store, { type: 'SYNCED', id, updatedAt: store.songs[0].updatedAt });
+    after = songsReducer(store, { type: 'HYDRATE', remote: [remoteCopy], allowPush: true });
+    expect(after.songs[0].title).toBe('Older copy on the account');
+    expect(after.unsynced).toEqual([]);
+  });
+
+  it('does not bring back a song deleted with no signal', () => {
+    const { store, id } = storeWithSong();
+    const ghost = store.songs[0];
+    const deleted = songsReducer(store, { type: 'DELETE_SONG', id });
+
+    const after = songsReducer(deleted, { type: 'HYDRATE', remote: [ghost], allowPush: true });
+    expect(after.songs).toEqual([]);
+    expect(after.unsynced).toEqual([id]); // the delete still has to go up
+  });
+
+  it("replaces another account's library, and hands back work set aside earlier", () => {
+    const { store } = storeWithSong(); // someone else's, left on this device
+    const mine = newSong('Mine, on the account');
+    const setAside = newSong('Mine, set aside last time');
+
+    const after = songsReducer(store, {
+      type: 'HYDRATE',
+      remote: [mine],
+      allowPush: false,
+      restored: [setAside, mine],
+    });
+    expect(after.songs.map((s) => s.id).sort()).toEqual([mine.id, setAside.id].sort());
+    // Only the restored song the account lacks needs writing up.
+    expect(after.unsynced).toEqual([setAside.id]);
+    expect(after.currentId).toBe(after.songs[0].id);
+  });
+
+  it('puts the most recently touched song first', () => {
+    const older = { ...newSong('Older'), updatedAt: 1000 };
+    const newer = { ...newSong('Newer'), updatedAt: 2000 };
+    const after = songsReducer(emptyStore(), {
+      type: 'HYDRATE',
+      remote: [older, newer],
+      allowPush: true,
+    });
+    expect(after.songs.map((s) => s.title)).toEqual(['Newer', 'Older']);
   });
 });
 
@@ -189,6 +315,58 @@ describe('migrating from v1', () => {
     expect(migrateV1('not json')).toBeNull();
     expect(migrateV1(JSON.stringify({ v: 2, songs: [] }))).toBeNull();
     expect(migrateV1(JSON.stringify({ v: 1, title: '  ', chords: [] }))).toBeNull();
+  });
+});
+
+/**
+ * "Just one chord" saved its shapes to a store of their own that no screen
+ * ever read back. Everything is a song now; these were somebody's work, so
+ * they become one rather than vanishing with the store that held them.
+ */
+describe('folding the loose chords', () => {
+  const loose = JSON.stringify([
+    { id: 'c1', spec: spec('G') },
+    { id: 'c2', spec: spec('Bm7') },
+  ]);
+
+  it('keeps them as one song, in order, under a title that says what they are', () => {
+    const song = looseChordsToSong(loose)!;
+    expect(song.title).toBe(LOOSE_CHORDS_TITLE);
+    expect(song.chords.map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(song.chords.map((c) => c.spec.name)).toEqual(['G', 'Bm7']);
+    expect(song.lyric).toBe('');
+    // Nobody was ever asked about a capo for these.
+    expect(song.capo).toBeUndefined();
+  });
+
+  it('makes no song out of nothing', () => {
+    expect(looseChordsToSong(null)).toBeNull();
+    expect(looseChordsToSong('not json')).toBeNull();
+    // What the old hook wrote on every start, chords or no chords.
+    expect(looseChordsToSong('[]')).toBeNull();
+    expect(looseChordsToSong('[{"junk":1}]')).toBeNull();
+    expect(looseChordsToSong('{"v":2}')).toBeNull();
+  });
+
+  it('pulls an off-neck shape back on, as the song store does', () => {
+    const raw = JSON.stringify([{ id: 'c1', spec: { ...spec('B'), rootFret: 99 } }]);
+    expect(looseChordsToSong(raw)!.chords[0].spec.rootFret).toBe(MAX_ROOT_FRET);
+  });
+
+  it('goes to the top of the library without taking over the open song', () => {
+    const { store, id } = storeWithSong();
+    const song = looseChordsToSong(loose)!;
+
+    const after = adoptLooseChords(store, song);
+    expect(after.songs.map((s) => s.id)).toEqual([song.id, id]);
+    expect(after.currentId).toBe(id);
+    // It is new to the account, like any other new song.
+    expect(after.unsynced).toContain(song.id);
+  });
+
+  it('becomes the open song when there was none', () => {
+    const song = looseChordsToSong(loose)!;
+    expect(adoptLooseChords(emptyStore(), song).currentId).toBe(song.id);
   });
 });
 

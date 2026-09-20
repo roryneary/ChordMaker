@@ -37,7 +37,7 @@ export default function Library({ onPick, onBack }: Props) {
         <div>
           <h1 className="display-sm">Chord library</h1>
           <p className="library-sub">
-            {LIBRARY.length} shapes, in the bag. No signal needed.
+            {LIBRARY.length} shapes, built in. No signal needed.
             {onPick && ' Tap one to use it.'}
           </p>
         </div>

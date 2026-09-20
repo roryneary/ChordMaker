@@ -19,7 +19,8 @@ export const chordBox = (_spec: ChordSpec) => ({ w: VB_W, h: VB_H });
  * SVG carries its own explicit width/height (mode: 'export') rather than a
  * percentage, so the browser rasterises it at that exact resolution instead
  * of guessing from a default replaced-element size. Shared by the
- * single-chord PNG export below and the whole-song PNG.
+ * single-chord PNG export below, the PDF's reference row, and the picture of
+ * every chord in a song (exportChordSheet.ts).
  */
 export async function chordToImage(spec: ChordSpec, scale = DEFAULT_SCALE): Promise<HTMLImageElement> {
   const svg = renderChordSVG(spec, { mode: 'export', scale, ...exportPalette });
@@ -38,6 +39,16 @@ export async function chordToImage(spec: ChordSpec, scale = DEFAULT_SCALE): Prom
   }
 }
 
+/** A canvas as a PNG. Rejects rather than resolving empty — see MAX_SHEET_H for when it can. */
+export function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Canvas produced no PNG data'))),
+      'image/png',
+    );
+  });
+}
+
 export async function chordToPngBlob(spec: ChordSpec, scale = DEFAULT_SCALE): Promise<Blob> {
   const img = await chordToImage(spec, scale);
   const box = chordBox(spec);
@@ -48,12 +59,7 @@ export async function chordToPngBlob(spec: ChordSpec, scale = DEFAULT_SCALE): Pr
   if (!ctx) throw new Error('Canvas 2D context unavailable');
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Canvas produced no PNG data'))),
-      'image/png',
-    );
-  });
+  return canvasToPngBlob(canvas);
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

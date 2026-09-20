@@ -74,6 +74,12 @@ So `src/lib/lyric.ts` mints an id per word at paste time, and `retokenise` re-ma
 lyric against the old words with an LCS so those ids survive. That is what makes the promise on
 the words editor true: chords you have already placed stay put when you edit the words.
 
+The one edit the app makes for you is **Remove blank lines** (`removeBlankLines`), for a paste
+that arrives double-spaced. It tells noise from structure by the shortest gap: if every line is
+followed by a blank, that much comes out of every gap and whatever is left is a verse break,
+kept as one line. It only ever deletes whole blank lines, so the word sequence is untouched and
+the LCS carries every id across.
+
 ## The chord library
 
 `src/data/chordLibrary.ts` — 48 shapes in the bundle, about 1.5 kB. No fetch, no schema, no
@@ -93,12 +99,82 @@ and F#m7 (`202220`) draw a bar over strings the player is letting ring.
 
 ## Screens
 
-Six routes and a back-stack in `src/app/routes.ts` — no router library. The stack exists because
-full screen must return to the screen you came from, not the landing page.
+A handful of routes and a back-stack in `src/app/routes.ts` — no router library. The stack exists
+because full screen must return to the screen you came from, not the landing page.
 
-Landing → words → song → chord editor / full screen / ready. The shell gives desktop a sidebar
-(which *is* the song list) and mobile a tab bar, and shows **neither** while editing a song or
-reading full screen.
+The landing page offers two ways in, and **both make a song** — they differ only in which half
+comes first:
+
+- **A song to play**: landing → words → song → chord editor / full screen / ready.
+- **Just the chords**: landing → song, skipping the words. It is for a lesson where a tutor is
+  calling out chords: the title is focused as the screen opens, so it is name, capo, Add. The
+  editor has one Save, which returns to the song — a second "Save, add another" button that
+  cleared the plate in place was removed because two saves on one screen confused more than the
+  round trip cost. Back (the arrow at the top, or the button beside Save) leaves
+  without saving, and asks first if the chord has changed (`chordChanged` in `lib/chordEdits.ts`). The words are added later from the
+  same song; nothing is converted, because it was never anything but a song.
+
+**Full screen pins the chord shapes above the words.** The strip sits between the bar and
+`.fs-words`, which is the one that scrolls — being outside the scroller is the whole mechanism,
+there is no sticky positioning and nothing measures anything. It rests on `.shell` having a
+fixed `height: 100dvh` rather than a minimum: give the shell an open-ended height and every
+screen's own scroller sizes to its content instead, so the page scrolls as a whole and the
+strip goes with it. It is one row that scrolls
+sideways rather than wrapping, because every row it wrapped onto would come out of the words;
+the diagrams are small (64 px, 88 px on desktop) on the grounds that mid-song you are checking
+a shape you already know. The PDF's chord reference row is the same idea on paper.
+
+**There is no such thing as a chord without a song.** "Just one chord" used to open the editor
+with no song and save to a store of its own (`USER_CHORDS_KEY`, mirrored to `users/{uid}/chords`)
+that no screen ever read back: a second persistence path that went nowhere. It is gone.
+`loadStore` folds anything left in that key into one song titled "Loose chords" and removes the
+key; the remote `users/{uid}/chords` documents are left where they are as orphaned data, since
+the rules already cover them and nothing reads them. `#/chord/new/new` now goes home.
+
+**Songs and Playlists are two destinations, in both navs** (`#/songs`, `#/playlists`). The
+sidebar shows the last few songs and the tab bar shows none, so Songs is the only way to an
+older song on a phone. It used to be called the gig bag, with playlists planned as a section
+inside it; the name needed explaining and the section would have buried the thing the app was
+missing, so each got its own screen and is called what it is.
+
+The shell gives desktop a sidebar and mobile a tab bar, and shows **neither** while editing a
+song or reading full screen. The library is a *step* when opened from the editor and a
+*destination* when opened from a browsing screen — `libraryIsStep` decides, and with it who
+owns the way out. One playlist is a browsing screen and keeps the tabs; adding songs to it is a
+step with one action of its own, and gets none.
+
+## Playlists
+
+A playlist is an ordered list of songs you already have, and **one document, items and all**:
+`{ id, name, items: { id, songId }[] }`. The order of `items` is the running order — there is no
+`position` field to keep in step with it — so a reorder is one write. Items carry their own id so
+the same song can be in a set twice and the two entries moved and removed independently.
+StreetPerformer, which this replaces, kept items in a subcollection: a reorder rewrote every item,
+and finding which playlists a song was in cost a query per playlist per song.
+
+**Playlists live in the song store, not a store of their own** (`SongStore.playlists`), and that
+is load-bearing. `DELETE_SONG` takes the song out of every playlist *in the same reducer step*;
+with two stores the second could only follow the first, and a reload between them would leave a
+playlist naming a song nobody can open. They sync exactly as songs do — their own
+`unsyncedPlaylists` list, the same `mergeOnSignIn`, the same stash when a different account signs
+in — to `users/{uid}/playlists/{playlistId}`, which the existing owner rule already covers. A
+store saved before playlists existed reads as having none: no version bump, the `capo` precedent.
+
+An entry whose song is missing is **skipped when drawn, not pruned** (`resolveItems`). The sweep
+covers deletes on this device, but a playlist can still arrive from the account naming a song
+another device deleted, and rewriting it on sight would turn a read into a write.
+
+**Each song row says which playlists it is in**, as pills (`membershipBySong`, one pass over data
+already in memory). A pill opens its playlist with that song picked out and scrolled into view;
+a row you move gets the same treatment, so a reorder never loses the row you moved. Which row to
+pick out is held in `App.tsx`, not in the route — it describes one arrival, and a hash carrying it
+would pick the row out again on every reload and every Back. This is also why `SongCard` is a box
+with a button in it rather than one big button: a pill is a control, and a button cannot hold one.
+
+Names are unique ignoring case, and never empty — a blank pill, or two alike, is a pill nobody can
+read. The reducer refuses both; the screens say why before it comes to that. The reducer *allows*
+the same song twice; the add screens do not offer it, because the likelier tap is a mistake, and
+show a song already in the playlist ticked and locked rather than hiding it.
 
 **"Looks right" is a claim, so it is checked before it is accepted.** `Song.capo` has three
 states, not two: a fret, an explicit `null` meaning "no capo", and **absent** meaning nobody
@@ -137,12 +213,33 @@ boolean would snap the home screen in at the end of the fade instead. Any key or
 the hold short, and reduced motion drops the draw-on and shortens every phase — the CSS and
 `phaseMs` carry the same numbers, so changing one means changing both.
 
-## Print
+## Print and share
 
-"Print for the case" is one A4 page: title, capo, a chord reference row, then the lyric with
+"Print for the stand" is one A4 page: title, capo, a chord reference row, then the lyric with
 chords over the words. `a4SheetLayout` is a pure, tested function that steps the type size down
 until the lyric fits rather than spilling onto a second sheet, and reports `overflows` rather
-than clipping silently.
+than clipping silently. A song with no words prints as a one-page chord sheet, with no extra code.
+
+**The picture of the chords** (`src/lib/exportChordSheet.ts`) is every shape in a song as one
+PNG with the title and capo over it — the thing you post in the band's chat after a lesson. It is
+a picture rather than the PDF because a chat shows a picture inline and makes you open a PDF.
+Portrait and a fixed 1080 px wide, three across, so it reads in the chat's own preview without
+zooming. `chordSheetLayout` is pure and tested. Two things in it are not obvious:
+
+- A very long chord list gets **more columns, never a taller picture**. Mobile Safari refuses a
+  canvas past a few thousand pixels on a side and `toBlob` then returns nothing at all.
+- Each chord name is centred **over the strings, not over the box**. The box reserves a column on
+  the right for the position numeral, so the middle of the box is not the middle of the fretboard.
+
+The title and names are drawn with the canvas's own `fillText`. That never taints the canvas,
+webfont or not; the restriction in "Not built" below is on fonts linked from *inside* an SVG.
+
+The Ready sheet offers it three ways, and only the ways the device can honour (`src/lib/share.ts`
+holds all the feature detection): **Send the chords** through the phone's share sheet, which is
+the short way into WhatsApp; **Save the chords as a picture**; and **Copy the chords**. Copying
+hands `ClipboardItem` the *promise* of the PNG rather than the PNG — Safari only allows a
+clipboard write from inside the tap that asked for it, and awaiting the picture first falls
+outside it. The chord editor can also save the one shape on the plate as a PNG.
 
 ## Accounts and the username
 
@@ -162,6 +259,130 @@ refuses `update` outright — renaming is delete-then-claim, so a claim's id and
 it can never drift apart. `lib/username.ts` holds the pure rules (normalising, the reserved
 list, what a legal handle is) and they are tested; keep its pattern and the one in the rules
 in step.
+
+## Sharing a song
+
+**A song is never opened up to a second person. It is copied out.** `users/{uid}/…` is
+readable by that uid and nobody else, with no exceptions, and that one fact is what makes an
+unshared song private. So sharing writes a *copy* to a top-level `shared/{shareId}`, and whoever
+keeps it gets another copy under their own uid — a new id, theirs outright, edited in place,
+local-first like any other song. Three documents, never the same one:
+
+```
+users/{me}/songs/{id}  ──share──►  shared/{shareId}  ──keep──►  users/{you}/songs/{newId}
+   Song.shared                      the copy others read            Song.copiedFrom
+```
+
+There is **no merge anywhere**, and there cannot be one: `retokenise` mints word ids per copy,
+so two edited copies of one song have nothing in common to merge on. That decides the rest.
+
+- **The owner shares changes on purpose** ("Share the changes"), never on save. Half-finished
+  edits do not leak, and recipients hear about a change once, not per typo. "Changed since
+  shared" is `updatedAt > shared.at`, and the reducer sets `at` (`SONG_SHARED`) — recording the
+  share is itself an edit, and must not read as a change; an edit made while the share was in
+  flight must.
+- **A recipient is always asked**: *Replace mine* (keeps the song's id, so playlists still hold
+  it) or *Keep mine, and add the new one* (mine gets `follows: false` and is never asked again).
+  The shared copy carries a `version` counter for this. **The word never reaches the UI** — a
+  song has been changed or it has not; nobody thinks of it as having versions.
+- **Whether there is anything new is asked, not stored.** `useSharedUpdates` does one `get` per
+  followed song, once a session and when the song is opened, and holds the answers in memory. It
+  is the database's answer as of a moment ago, so it stays out of the song store, and the reducer
+  goes on not knowing a server exists.
+- **Sharing is a call the player waits on**, like an export, not something queued through
+  `unsynced`: it needs a signal and says why when it fails (`useSharing`). Only its *result*,
+  `Song.shared`, rides the ordinary sync, so the owner's other devices know.
+
+**A link is unlisted, not private — never call it private.** `shared/{id}` can be read by
+anyone holding the id, signed in or not, so a bandmate opens a song without an account; and it
+can be *listed* by nobody. The id is a `crypto.randomUUID()` with no fallback (`newShareId`),
+because the link is the key. Anyone a link is forwarded to can read the song until the owner
+stops sharing, which deletes the copy; copies already kept are their keepers' and stay.
+
+**Deleting a shared song takes the shared copy down first, and only deletes if that worked**
+(`onDelete` in `useSharing`; the sheet is `DeleteSongSheet`). Once the song is gone nothing
+here remembers its share id, so a copy left up would be published for good with nobody able to
+remove it. The cost is that a shared song cannot be deleted signed out or with no signal — the
+sheet stays open and says why — which is the right way round for the one action with no undo.
+Copies other people kept are theirs and are never touched. The rules allow deleting a share
+that is already gone, so a song whose owner stopped sharing from another device can still go.
+
+**The browsable library reads cards, not songs.** A song is mostly its word list — every word
+carries a 36-character id — so a typical one is ~25 kB and a page of thirty would be most of a
+megabyte. A song the owner chooses to show also gets a 1–2 kB card at `sharedIndex/{shareId}`,
+written in the same batch as the song so the two cannot drift; "listed" *is* the card existing.
+**The way in is a checkbox on every song's row, "Make available globally"** (`SongCard`'s
+`global`). It began as a tick-box inside the "Send a link to the band" sheet, where nobody
+wanting to publish a song would think to look. Ticking it shares a never-shared song straight
+into the library, or adds one already shared by link. Unticking takes it out of the library *and
+only that* — the link may have been sent to someone, so it still opens, the row says "Shared by
+link", and stopping altogether is in the song's share sheet. The same box, by the same name, is
+in that sheet. Search is a prefix match on the title, because that is the text search Firestore does unaided.
+Shared songs has no tab — six is what fits at 360 px — and is reached from Songs and the sidebar.
+`#/shared`, because `#/library` is the chord library.
+
+**The rules name every field, and must be kept in step with the types.** `users/{uid}` used to
+be one wildcard, which let anyone signed in keep any data under their own uid on this project's
+bill. Now `firestore.rules` names the collections and whitelists the fields of a song and a
+playlist. The price: **add a field to `Song` or `Playlist` and not to the rules, and every save
+is refused.** The sync line says so, but only once it has happened. Size limits live there too,
+mirrored in `lib/sharedSong.ts` so the words editor can say "too long" first: the rule of thumb
+is four times the longest real song (Bat Out of Hell, ~4,500 characters), so 20,000.
+
+## Whether it is really saved
+
+`localStorage` is what the app reads and writes; an account mirrors it to
+`users/{uid}/songs/{songId}`. The part worth understanding is how the app knows the mirror is
+true, because for a while it did not: every Firestore call was fire-and-forget, a refused write
+became an unhandled rejection, and the sidebar said "Songs saved to your account" regardless. A
+broken sync was indistinguishable from a working one.
+
+**The store lists what the account has not confirmed** (`SongStore.unsynced`). The reducer adds
+an id whenever it creates, edits or deletes a song — atomically with the change, which an effect
+marking ids after the render could not do — and only the account's own answer takes it off
+(`SYNCED`, which compares `updatedAt` so an edit made while a write was in flight stays listed).
+The list is persisted with the songs, so an edit made with no signal is still known to be unsaved
+tomorrow. `useSongs` sends what is on the list; it no longer diffs renders to guess.
+
+That list is also what makes the sign-in merge safe to run on every page load. "Remote wins" on
+an id both sides have — except for ids on the list, where the remote copy is known to be the
+stale one: local wins and goes back up, and an unconfirmed delete stays deleted instead of being
+resurrected. Without it, editing a song on a dead connection and reopening the app later
+silently reverted the edit. The merge runs **inside the reducer** (`HYDRATE`), against the store
+as it is at that moment, so a song made while the account was still loading cannot be lost to
+the gap.
+
+**A different account signing in on the same device** replaces the library here with its own —
+it has to, the songs are not theirs to see. That used to simply overwrite it, so signing in with
+Google after using email (two uids, one person) emptied the device. The stranded songs are now
+stashed under the uid they belonged to and handed back when that account next signs in here.
+
+`src/lib/syncStatus.ts` turns all of this into one honest sentence under the handle — saving,
+saved, no signal, or *not saved, and why*, with a way to try again — on the sidebar chip and on
+the phone's Account screen. Refused writes are retried on the next change, when the signal
+returns, and on request; never in a loop.
+
+**There is no Save button, and there is a "Saved" line instead.** Every change is committed
+before a button could be pressed, so the button would commit nothing — and a button that looks
+like the thing keeping your work teaches you to fear leaving without pressing it, which on a
+phone, where Back is one tap, is the opposite of what is true. What was actually missing was the
+reassurance: that honest sentence lived only on the account chip, and `chromeFor` gives the song
+screen and the words editor **no chrome at all on a phone**, so for the whole time you are
+writing there was nothing on screen saying the song was kept. `SavedLine` puts it beside the
+title on both, which is where every autosaving editor puts it.
+
+It says a **different** sentence there (`savedLabel`, beside `syncLabel`, both pure and tested).
+The chip is about the account, so signed out it reads "Keep your songs on every device" — an
+offer, which is the wrong thing to answer "is this kept?" with. In a song the line leads with the
+device, which `localStorage` has already done, and mentions the account only where the two
+differ: plain "Saved" is reserved for both places holding it.
+
+**Saving is announced only once it has lasted half a second.** There is a Firestore write per
+keystroke, so the phase flips to `syncing` and back at typing speed, and said out loud that is a
+header flickering "Saving…"/"Saved" per character — which reads as a machine in trouble. A write
+that lands inside the window is never mentioned; a stall is. Nothing is over-claimed by the wait,
+because the sentence leads with the device either way, and `error` is never delayed: a save that
+did not happen is the one thing here worth interrupting anyone for.
 
 ## Hosting and the Firebase config
 
@@ -187,8 +408,8 @@ degrade. Being lazy also keeps the SDK out of the first chunk for a player who n
 `hooks/useAuth.ts` imports the module, but nothing it exports runs until a screen asks for the
 auth or the database.
 
-There is **no Cloud Storage**, deliberately. Everything persisted is small JSON: a song is well
-under 20 kB against Firestore's 1 MiB document limit, and the PNG and PDF are generated in the
+There is **no Cloud Storage**, deliberately. Everything persisted is small JSON: a typical song
+is about 25 kB, and the longest the rules allow under half of Firestore's 1 MiB document limit, and the PNG and PDF are generated in the
 browser at the moment you export them. A stored export would only ever be a stale copy of
 something a second of work regenerates.
 
@@ -199,7 +420,7 @@ until those domains are added.
 
 ## Not built
 
-Sending a link to the band, a real chord speller (names are recognised against the library and
+A real chord speller (names are recognised against the library and
 stay user-editable), left-handed mirroring, other instruments, and finger numbers in the dots —
 though `Dot` already carries an optional `finger` field the reducer ignores.
 

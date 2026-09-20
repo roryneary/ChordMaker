@@ -1,6 +1,15 @@
-import { BagSimple, GridFour, PencilSimple, PlusCircle, UserCircle } from '@phosphor-icons/react';
+import {
+  GridFour,
+  MusicNotes,
+  PencilSimple,
+  Playlist,
+  PlusCircle,
+  UserCircle,
+  UsersThree,
+} from '@phosphor-icons/react';
 import type { Route } from '../../app/routes';
 import type { Account } from '../../hooks/useAuth';
+import type { SyncView } from '../../lib/syncStatus';
 import { ChordCreatorLockup } from '../Brand';
 import type { Song } from '../../types/song';
 import { LIBRARY } from '../../data/chordLibrary';
@@ -8,10 +17,13 @@ import { lineCount, unchordedLineCount } from '../../lib/lyric';
 
 interface Props {
   account: Account | null;
+  /** Whether the account really has the songs. Never assumed — see lib/syncStatus.ts. */
+  sync: SyncView;
   onAccount: () => void;
   onSignOut: () => Promise<void>;
   route: Route;
   songs: Song[];
+  playlistCount: number;
   currentId: string | null;
   onGo: (route: Route) => void;
   onStart: () => void;
@@ -20,21 +32,51 @@ interface Props {
 const SHOWN = 4;
 
 /**
- * The sidebar IS the song list, and the open song is selected in it. There is
- * deliberately no "Your songs" nav item: the list below makes it redundant, and
- * an active nav item claiming "list" while the main pane shows one song was a
- * real inconsistency in an earlier revision.
+ * The line under the handle. It used to be the fixed words "Songs saved to
+ * your account", printed over writes nobody checked; now it is whatever is
+ * true, and when that is a failure it carries the way to try again.
+ */
+export function SyncLine({ sync }: { sync: SyncView }) {
+  const failed = sync.phase === 'error';
+  return (
+    <>
+      <em className={failed ? 'is-error' : undefined} role="status">
+        {sync.label}
+      </em>
+      {failed && (
+        <button type="button" className="sync-retry" onClick={sync.retry}>
+          Try again
+        </button>
+      )}
+    </>
+  );
+}
+
+/**
+ * The nav, and under it the few songs you touched last, with the open one
+ * selected — a way straight back into the song you were in, which is not what
+ * a nav item does.
+ *
+ * That list is headed "Recent", not "Your songs". It sat under the latter with
+ * the same count as the Songs nav item beside it, so the sidebar appeared to
+ * hold two song lists and to disagree with itself about which was which. Songs
+ * is all of them and carries the count; this is the last few and carries none.
  */
 export default function Sidebar({
   account,
+  sync,
   onAccount,
   onSignOut,
   route,
   songs,
+  playlistCount,
   currentId,
   onGo,
   onStart,
 }: Props) {
+  const inPlaylists =
+    route.name === 'playlists' || route.name === 'playlist' || route.name === 'playlistAdd';
+  const inShared = route.name === 'shared' || route.name === 'sharedSong';
   const shown = songs.slice(0, SHOWN);
   const rest = songs.length - shown.length;
 
@@ -57,16 +99,39 @@ export default function Sidebar({
         <span>Chord library</span>
         <em className="nav-count">{LIBRARY.length}</em>
       </button>
-      <button type="button" className="nav-item">
-        <BagSimple size={18} />
-        <span>Gig bag</span>
+      <button
+        type="button"
+        className={`nav-item${route.name === 'songs' ? ' is-active' : ''}`}
+        onClick={() => onGo({ name: 'songs' })}
+      >
+        <MusicNotes size={18} />
+        <span>Songs</span>
+        <em className="nav-count">{songs.length}</em>
+      </button>
+      <button
+        type="button"
+        className={`nav-item${inPlaylists ? ' is-active' : ''}`}
+        onClick={() => onGo({ name: 'playlists' })}
+      >
+        <Playlist size={18} />
+        <span>Playlists</span>
+        <em className="nav-count">{playlistCount}</em>
+      </button>
+      {/* No count: it is other people's, and knowing it would cost a query
+          on every page load for a number nobody needs. */}
+      <button
+        type="button"
+        className={`nav-item${inShared ? ' is-active' : ''}`}
+        onClick={() => onGo({ name: 'shared' })}
+      >
+        <UsersThree size={18} />
+        <span>Shared songs</span>
       </button>
 
       <hr className="nav-rule" />
 
       <div className="nav-section">
-        <span>Your songs</span>
-        <em>{songs.length}</em>
+        <span>Recent</span>
       </div>
 
       <ul className="song-list">
@@ -99,7 +164,11 @@ export default function Sidebar({
         })}
         {rest > 0 && (
           <li>
-            <button type="button" className="song-row is-more">
+            <button
+              type="button"
+              className="song-row is-more"
+              onClick={() => onGo({ name: 'songs' })}
+            >
               See all {songs.length}
             </button>
           </li>
@@ -115,7 +184,7 @@ export default function Sidebar({
           <span className="avatar">{(account.display ?? account.handle).charAt(0).toUpperCase()}</span>
           <span className="user-meta">
             <strong>@{account.handle}</strong>
-            <em>Songs saved to your account</em>
+            <SyncLine sync={sync} />
           </span>
           <button type="button" className="btn-ghost" onClick={() => void onSignOut()}>
             Out
@@ -128,7 +197,9 @@ export default function Sidebar({
           </span>
           <span className="user-meta">
             <strong>Sign in</strong>
-            <em>Keep your songs on every device</em>
+            {/* A build with no database cannot keep that promise, so it does
+                not make it. */}
+            <em>{sync.phase === 'off' ? sync.label : 'Keep your songs on every device'}</em>
           </span>
         </button>
       )}

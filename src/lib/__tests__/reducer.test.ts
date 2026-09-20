@@ -137,6 +137,18 @@ describe('invariants', () => {
     expect(s.dots).toHaveLength(3);
   });
 
+  /* Clearing the plate must leave nothing behind, or a shape that survived it
+     would be saved again under the next chord's name. */
+  it('CLEAR leaves nothing of the last shape behind', () => {
+    let s = dot(emptySpec(), 5, 3);
+    s = chordReducer(s, { type: 'COMPLETE_BARRE', fret: 1, a: 6, b: 1 });
+    s = chordReducer(s, { type: 'CYCLE_MARKER', string: 1 });
+    s = chordReducer(s, { type: 'NUDGE_ROOT_FRET', by: 4 });
+    s = { ...s, name: 'F#m' };
+
+    expect(chordReducer(s, { type: 'CLEAR' })).toEqual(emptySpec());
+  });
+
   it('reports emptiness for the export gate', () => {
     expect(isEmptySpec(emptySpec())).toBe(true);
     expect(isEmptySpec(chordReducer(emptySpec(), { type: 'CYCLE_MARKER', string: 1 }))).toBe(false);

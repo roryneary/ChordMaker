@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowsInSimple, Sun } from '@phosphor-icons/react';
 import CapoChip from '../components/CapoChip';
+import ChordDiagram from '../components/ChordDiagram';
 import LyricBlock from '../components/lyric/LyricBlock';
 import { useIsDesktop } from '../components/shell/useBreakpoint';
 import { groupByLine, lineCount } from '../lib/lyric';
@@ -12,8 +13,17 @@ interface Props {
   onExit: () => void;
 }
 
-/** Two steps, not a slider: you adjust this with a guitar on your knee. */
-const SCALES = [1, 1.25] as const;
+/**
+ * Steps, not a slider: you adjust this with a guitar on your knee. The middle
+ * one is the default and the size the screen was drawn at. The step below it is
+ * for the times you want the next verse on the screen rather than bigger words
+ * — a page you can see the shape of beats a page you have to scroll.
+ */
+const SCALES = [0.78, 1, 1.25] as const;
+const DEFAULT_SCALE = SCALES[1];
+
+/** Drawn at their own size by `.seg`, so the buttons look like what they do. */
+const SCALE_LABELS = ['A−', 'A', 'A+'] as const;
 
 /**
  * Keeps the screen awake while the song is open.
@@ -64,7 +74,7 @@ function useWakeLock(active: boolean): boolean {
 /** M05 / D3. Read the song while playing. No chrome. */
 export default function FullScreen({ song, nameOf, onExit }: Props) {
   const isDesktop = useIsDesktop();
-  const [scale, setScale] = useState<number>(SCALES[0]);
+  const [scale, setScale] = useState<number>(DEFAULT_SCALE);
   const awake = useWakeLock(true);
 
   const base = isDesktop ? { word: 27, chord: 15 } : { word: 23, chord: 14 };
@@ -73,16 +83,17 @@ export default function FullScreen({ song, nameOf, onExit }: Props) {
 
   const lines = lineCount(song.lyric);
   const grouped = groupByLine(song.words, lines);
-  const half = Math.ceil(grouped.length / 2);
 
-  const block = (from: number, to: number) => (
+  // One column at every width: a song reads top to bottom, and a second column
+  // beside the first looks like a different part of the song.
+  const block = (
     <div className="fs-col">
-      {grouped.slice(from, to).map((lineWords, i) =>
+      {grouped.map((lineWords, i) =>
         lineWords.length === 0 ? (
-          <div key={`g${from + i}`} className="lyric-gap" aria-hidden="true" />
+          <div key={`g${i}`} className="lyric-gap" aria-hidden="true" />
         ) : (
           <LyricBlock
-            key={`l${from + i}`}
+            key={`l${i}`}
             lyric={lineWords.map((w) => w.text).join(' ')}
             words={lineWords.map((w) => ({ ...w, line: 0 }))}
             placements={song.placements}
@@ -102,35 +113,36 @@ export default function FullScreen({ song, nameOf, onExit }: Props) {
         </button>
         <span className="fs-title">{song.title.trim() || 'Untitled'}</span>
         <div className="seg" role="group" aria-label="Text size">
-          <button
-            type="button"
-            className={scale === SCALES[0] ? 'is-on' : undefined}
-            onClick={() => setScale(SCALES[0])}
-            aria-pressed={scale === SCALES[0]}
-          >
-            A&minus;
-          </button>
-          <button
-            type="button"
-            className={scale === SCALES[1] ? 'is-on' : undefined}
-            onClick={() => setScale(SCALES[1])}
-            aria-pressed={scale === SCALES[1]}
-          >
-            A+
-          </button>
+          {SCALES.map((step, i) => (
+            <button
+              key={step}
+              type="button"
+              className={scale === step ? 'is-on' : undefined}
+              onClick={() => setScale(step)}
+              aria-pressed={scale === step}
+            >
+              {SCALE_LABELS[i]}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className={`fs-words${isDesktop ? ' fs-two-col' : ''}`}>
-        {isDesktop ? (
-          <>
-            {block(0, half)}
-            {block(half, grouped.length)}
-          </>
-        ) : (
-          block(0, grouped.length)
-        )}
-      </div>
+      {/* The shapes, pinned: outside the scroller, so they are still there at the
+          last verse. One row that scrolls sideways rather than wrapping — every
+          row it wrapped onto would come straight out of the words, and the words
+          are what the screen is for. Nothing to show, no strip. */}
+      {song.chords.length > 0 && (
+        <ul className={`fs-chords${isDesktop ? ' fs-chords-wide' : ''}`} aria-label="The chords">
+          {song.chords.map((chord) => (
+            <li key={chord.id}>
+              <strong>{chord.spec.name.trim() || '—'}</strong>
+              <ChordDiagram spec={chord.spec} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className={`fs-words${isDesktop ? ' fs-wide' : ''}`}>{block}</div>
 
       <div className="fs-bottom">
         <CapoChip capo={song.capo} variant="statement" />

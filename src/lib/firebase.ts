@@ -15,7 +15,7 @@ import { type Firestore, connectFirestoreEmulator, getFirestore } from 'firebase
  * never configured, which is a programming error rather than a user state.
  *
  * There is no `getStorage` on purpose. Everything the app persists is small
- * JSON — a song is well under 20 kB against Firestore's 1 MiB document limit —
+ * JSON — a typical song is about 25 kB against Firestore's 1 MiB document limit —
  * and the PNG and PDF are generated in the browser at the moment you export
  * them. A stored export would only ever be a stale copy of something a second
  * of work regenerates. See ROADMAP.md, "Database support".

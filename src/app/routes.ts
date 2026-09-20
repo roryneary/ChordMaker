@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * Seven screens and a back-stack. No router library: this is a small state
+ * A handful of screens and a back-stack. No router library: this is a small state
  * machine, and the codebase carries neither a router nor a state library.
  *
  * The stack exists because full screen specifies "exit returns to the previous
@@ -9,12 +9,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 export type Route =
   | { name: 'landing' }
-  | { name: 'chordEditor'; songId: string | null; chordId: string | null }
+  /* A chord always belongs to a song. There used to be a song-less form of
+     this route for "Just one chord"; it saved to a store nothing read. */
+  | { name: 'chordEditor'; songId: string; chordId: string | null }
   | { name: 'words'; songId: string }
   | { name: 'song'; songId: string }
   | { name: 'fullScreen'; songId: string }
   | { name: 'ready'; songId: string }
   | { name: 'library' }
+  /** Every song. Plural, and nothing to do with `song` below it. */
+  | { name: 'songs' }
+  /** Every playlist, then one of them, then the step that adds songs to it. */
+  | { name: 'playlists' }
+  | { name: 'playlist'; playlistId: string }
+  | { name: 'playlistAdd'; playlistId: string }
+  /* Songs other people have shared, then one of them — which is also where a
+     link sent to the band lands. Not under `library`: that is the chord library. */
+  | { name: 'shared' }
+  | { name: 'sharedSong'; shareId: string }
   | { name: 'signIn' };
 
 export const LANDING: Route = { name: 'landing' };
@@ -25,10 +37,22 @@ export function toHash(route: Route): string {
       return '#/';
     case 'library':
       return '#/library';
+    case 'songs':
+      return '#/songs';
+    case 'playlists':
+      return '#/playlists';
+    case 'playlist':
+      return `#/playlist/${route.playlistId}`;
+    case 'playlistAdd':
+      return `#/playlist/${route.playlistId}/add`;
+    case 'shared':
+      return '#/shared';
+    case 'sharedSong':
+      return `#/shared/${route.shareId}`;
     case 'signIn':
       return '#/signin';
     case 'chordEditor':
-      return `#/chord/${route.songId ?? 'new'}/${route.chordId ?? 'new'}`;
+      return `#/chord/${route.songId}/${route.chordId ?? 'new'}`;
     case 'words':
       return `#/song/${route.songId}/words`;
     case 'fullScreen':
@@ -45,12 +69,21 @@ export function fromHash(hash: string): Route {
   if (!parts.length) return LANDING;
 
   if (parts[0] === 'library') return { name: 'library' };
+  if (parts[0] === 'songs') return { name: 'songs' };
+  if (parts[0] === 'playlists') return { name: 'playlists' };
+  if (parts[0] === 'playlist' && parts[1]) {
+    const playlistId = parts[1];
+    return parts[2] === 'add' ? { name: 'playlistAdd', playlistId } : { name: 'playlist', playlistId };
+  }
+  if (parts[0] === 'shared') {
+    return parts[1] ? { name: 'sharedSong', shareId: parts[1] } : { name: 'shared' };
+  }
   if (parts[0] === 'signin') return { name: 'signIn' };
 
-  if (parts[0] === 'chord') {
-    const songId = parts[1] && parts[1] !== 'new' ? parts[1] : null;
+  // `#/chord/new/new` was the song-less editor. A bookmark to it lands home.
+  if (parts[0] === 'chord' && parts[1] && parts[1] !== 'new') {
     const chordId = parts[2] && parts[2] !== 'new' ? parts[2] : null;
-    return { name: 'chordEditor', songId, chordId };
+    return { name: 'chordEditor', songId: parts[1], chordId };
   }
 
   if (parts[0] === 'song' && parts[1]) {

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { Route } from '../../app/routes';
 import type { Song } from '../../types/song';
 import type { Account } from '../../hooks/useAuth';
+import type { SyncView } from '../../lib/syncStatus';
 import Sidebar from './Sidebar';
 import TabBar from './TabBar';
 import { useIsDesktop } from './useBreakpoint';
@@ -9,6 +10,7 @@ import { useIsDesktop } from './useBreakpoint';
 interface Props {
   /** Null when signed out, or when Firebase is not configured at all. */
   account: Account | null;
+  sync: SyncView;
   onAccount: () => void;
   onSignOut: () => Promise<void>;
   route: Route;
@@ -16,6 +18,7 @@ interface Props {
       destination or a step inside an editing flow. */
   previous?: Route;
   songs: Song[];
+  playlistCount: number;
   currentId: string | null;
   onGo: (route: Route) => void;
   onStart: () => void;
@@ -39,8 +42,21 @@ interface Props {
  * navigated to. It decides both the chrome and who owns the way out: a step
  * leaves by its own Back button, a destination by the tab bar or the sidebar.
  */
+/** Screens you go *to*: the tab bar's own destinations, one playlist, and the
+    songs other people have shared. One shared song is not among them: it is
+    where a link lands, with one thing to do and a Back of its own. */
+const BROWSING: ReadonlyArray<Route['name']> = [
+  'landing',
+  'songs',
+  'playlists',
+  'playlist',
+  'shared',
+];
+
 export function libraryIsStep(previous?: Route): boolean {
-  return !!previous && previous.name !== 'landing';
+  // Getting to the library from a browsing screen is going somewhere, not
+  // pausing half-way through a song.
+  return !!previous && !BROWSING.includes(previous.name);
 }
 
 export function chromeFor(
@@ -53,18 +69,22 @@ export function chromeFor(
      away from by a sidebar click while the account is still half-made. */
   if (route.name === 'signIn') return 'none';
   if (isDesktop) return 'sidebar';
-  if (route.name === 'landing') return 'tabs';
+  /* One playlist keeps the tabs: it is a list you are reading, like the songs.
+     Adding songs to it is a step with a Done of its own, so it gets none. */
+  if (BROWSING.includes(route.name)) return 'tabs';
   if (route.name === 'library') return libraryIsStep(previous) ? 'none' : 'tabs';
   return 'none';
 }
 
 export default function AppShell({
   account,
+  sync,
   onAccount,
   onSignOut,
   route,
   previous,
   songs,
+  playlistCount,
   currentId,
   onGo,
   onStart,
@@ -78,17 +98,21 @@ export default function AppShell({
       {chrome === 'sidebar' && (
         <Sidebar
           account={account}
+          sync={sync}
           onAccount={onAccount}
           onSignOut={onSignOut}
           route={route}
           songs={songs}
+          playlistCount={playlistCount}
           currentId={currentId}
           onGo={onGo}
           onStart={onStart}
         />
       )}
       <main className="shell-main">{children}</main>
-      {chrome === 'tabs' && <TabBar route={route} onGo={onGo} onStart={onStart} />}
+      {chrome === 'tabs' && (
+        <TabBar account={account} route={route} onGo={onGo} onStart={onStart} />
+      )}
     </div>
   );
 }

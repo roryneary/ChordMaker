@@ -16,6 +16,49 @@ export interface Word {
 /** wordId → SavedChord.id */
 export type Placements = Record<string, string>;
 
+/**
+ * On the owner's song: it has been shared, and this is where. The shared copy
+ * is a separate document (`shared/{shareId}`, see types/sharedSong.ts) — nobody
+ * is ever let into the owner's own songs, so sharing copies out instead.
+ */
+export interface SharedRef {
+  shareId: string;
+  /** Counts each time the owner shares their changes. Never shown: the UI says
+      "changed", not "version 3". */
+  version: number;
+  /**
+   * The song's `updatedAt` as of the last time it was shared, so "you've
+   * changed this since you shared it" is `updatedAt > at`. The reducer sets it
+   * (`SONG_SHARED`), because recording the share is itself an edit and must not
+   * read as a change.
+   */
+  at: number;
+  /** Whether it also shows in the browsable library, or travels by link only. */
+  listed: boolean;
+}
+
+/**
+ * On a recipient's song: whose it was. The song is theirs outright — this is
+ * lineage, and the address to ask whether the sender has changed theirs since.
+ *
+ * It names the sender by `uid`, and carries the handle only to draw "from
+ * @rory" without a lookup: people rename, and a lineage keyed on the name would
+ * be orphaned by it (ROADMAP.md §3). Never an email — this travels with the
+ * song for good.
+ */
+export interface CopiedFrom {
+  shareId: string;
+  /** The shared copy's version this song was taken at, or last caught up to. */
+  version: number;
+  uid: string;
+  handle: string;
+  /** The handle as its owner typed it. Absent falls back to `handle`. */
+  display?: string;
+  /** `false` once the player chose "keep mine": they have gone their own way,
+      and are not asked about the sender's changes again. Absent means it follows. */
+  follows?: false;
+}
+
 export interface Song {
   id: string;
   title: string;
@@ -43,6 +86,10 @@ export interface Song {
   /** Derived from `lyric`, but ids are stable across edits — see lib/lyric.ts. */
   words: Word[];
   placements: Placements;
+  /** Both optional, the `capo` precedent: absent is a meaningful state — never
+      shared, made here — and every song already saved reads correctly without them. */
+  shared?: SharedRef;
+  copiedFrom?: CopiedFrom;
   createdAt: number;
   updatedAt: number;
 }

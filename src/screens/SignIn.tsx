@@ -1,6 +1,9 @@
 import { type FormEvent, useState } from 'react';
-import { ArrowLeft, GoogleLogo } from '@phosphor-icons/react';
+import { ArrowLeft, CaretRight, GoogleLogo } from '@phosphor-icons/react';
 import { ChordCreatorLockup } from '../components/Brand';
+import type { Account } from '../hooks/useAuth';
+import { SyncLine } from '../components/shell/Sidebar';
+import type { SyncView } from '../lib/syncStatus';
 import {
   AuthCancelled,
   authMessage,
@@ -14,6 +17,16 @@ import { HandleTakenError, checkHandle, normaliseHandle, suggestHandle } from '.
 interface Props {
   /** Set once Firebase reports a user; the screen then asks for the handle. */
   needsHandle: boolean;
+  /** A finished account, if any — reached via the mobile tab bar's "Account"
+      entry, which routes here whether or not sign-in is already done. */
+  account: Account | null;
+  /** The phone's only view of whether the account has the songs: the sidebar
+      that carries this line on desktop does not exist here. */
+  sync: SyncView;
+  onSignOut: () => Promise<void>;
+  /** How many songs the account screen's chip leads to. */
+  songCount: number;
+  onOpenSongs: () => void;
   suggestFrom?: string | null;
   onClaim: (handle: string) => Promise<string>;
   onDone: () => void;
@@ -32,7 +45,18 @@ type Mode = 'in' | 'up';
  * path, but "sign in with Google" alone excludes people, and this is an app
  * you might set up on a phone in a rehearsal room.
  */
-export default function SignIn({ needsHandle, suggestFrom, onClaim, onDone, onCancel }: Props) {
+export default function SignIn({
+  needsHandle,
+  account,
+  sync,
+  onSignOut,
+  songCount,
+  onOpenSongs,
+  suggestFrom,
+  onClaim,
+  onDone,
+  onCancel,
+}: Props) {
   const [mode, setMode] = useState<Mode>('in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -94,6 +118,62 @@ export default function SignIn({ needsHandle, suggestFrom, onClaim, onDone, onCa
       )
       .finally(() => setBusy(false));
   };
+
+  /* Reachable only from the mobile tab bar's "Account" entry — the desktop
+     sidebar never routes here once signed in, since its own chip already
+     carries the Out button. A finished account has to land somewhere other
+     than the sign-in form, or tapping the tab a second time would look like
+     it forgot who you were. */
+  if (account?.handle) {
+    return (
+      <div className="signin">
+        <button type="button" className="icon-btn" onClick={onCancel} aria-label="Back">
+          <ArrowLeft size={20} />
+        </button>
+        <div className="brand brand-sm">
+          <ChordCreatorLockup size={26} />
+        </div>
+        <h1 className="display-sm">Your account.</h1>
+
+        {/* A button, because it was always pressed like one: it is a card the
+            same shape as "Sign out" under it, with your name on it, and it used
+            to do nothing. It goes where pressing your own name says you want to
+            go — your songs — which also gives this screen a way on that is not
+            the back arrow or signing out.
+
+            The sync line sits outside it: a failed sync brings its own "Try
+            again" button, and a button cannot hold another. */}
+        <button type="button" className="user-chip is-action" onClick={onOpenSongs}>
+          <span className="avatar">
+            {(account.display ?? account.handle).charAt(0).toUpperCase()}
+          </span>
+          <span className="user-meta">
+            <strong>@{account.handle}</strong>
+            <em>
+              {songCount === 0
+                ? 'No songs yet'
+                : `Your ${songCount === 1 ? 'song' : `${songCount} songs`}`}
+            </em>
+          </span>
+          <CaretRight size={16} />
+        </button>
+        <p className="user-meta account-sync">
+          <SyncLine sync={sync} />
+        </p>
+
+        {error && <p className="signin-error">{error}</p>}
+
+        <button
+          type="button"
+          className="btn-secondary btn-block"
+          disabled={busy}
+          onClick={() => void attempt(async () => { await onSignOut(); onDone(); })}
+        >
+          {busy ? 'Signing out…' : 'Sign out'}
+        </button>
+      </div>
+    );
+  }
 
   if (needsHandle) {
     const preview = normaliseHandle(handle);

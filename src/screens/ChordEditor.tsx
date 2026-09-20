@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CaretLeft } from '@phosphor-icons/react';
+import { CaretLeft, DownloadSimple } from '@phosphor-icons/react';
 import ChordPlate from '../components/ChordPlate';
 import { emptySpec, useChordSpec } from '../hooks/useChordSpec';
 import { COMMON_NAMES, findLibraryChord, libraryChordToSpec } from '../data/chordLibrary';
+import { chordChanged } from '../lib/chordEdits';
 import { inferChordName } from '../lib/chordName';
+import { chordFilename, chordToPngBlob, downloadBlob } from '../lib/exportPng';
 import { MAX_ROOT_FRET, MIN_ROOT_FRET } from '../lib/layout';
 import { ordinal, toRoman } from '../lib/numerals';
 import { specToShape } from '../lib/shape';
@@ -11,9 +13,13 @@ import { useThemeValue } from '../theme/ThemeProvider';
 import type { ChordSpec, StringNumber } from '../types/chord';
 
 interface Props {
-  /** The song this chord is being added to, if any. */
+  /** The song this chord belongs to. Null only while it has no name yet. */
   songTitle: string | null;
+  /** How many chords the song already has, so the bar can keep count. */
+  chordCount: number;
   initial: ChordSpec | null;
+  /** The chord as the song holds it, or null for a new one — what "unsaved" is measured against. */
+  saved: ChordSpec | null;
   onSave: (spec: ChordSpec) => void;
   onCancel: () => void;
   onBrowseAll: () => void;
@@ -22,7 +28,9 @@ interface Props {
 /** M02. One shape, defined on the fretboard or taken from the library. */
 export default function ChordEditor({
   songTitle,
+  chordCount,
   initial,
+  saved,
   onSave,
   onCancel,
   onBrowseAll,
@@ -36,6 +44,8 @@ export default function ChordEditor({
   const [active, setActive] = useState<StringNumber | null>(null);
   // Null means "follow the shape"; a string means the user has taken over.
   const [typedName, setTypedName] = useState<string | null>(initial?.name || null);
+  const [savingImage, setSavingImage] = useState(false);
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
 
   const inferred = inferChordName(spec);
   const name = typedName ?? inferred ?? '';
@@ -98,17 +108,50 @@ export default function ChordEditor({
      recognise, which are exactly the ones the player has to label. */
   const unnamed = !name.trim();
 
+  /* Both ways back come through here. Leaving an untouched chord is instant;
+     leaving edits asks first, because a shape is fiddly to put back together. */
+  const leave = () => {
+    if (chordChanged({ ...spec, name }, saved ?? emptySpec())) setConfirmingLeave(true);
+    else onCancel();
+  };
+
+  useEffect(() => {
+    if (!confirmingLeave) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setConfirmingLeave(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [confirmingLeave]);
+
+  /** One shape as a picture — black on white, whatever the theme on screen. */
+  const saveImage = () => {
+    const saved = name.trim();
+    setSavingImage(true);
+    chordToPngBlob({ ...spec, name: saved })
+      .then((blob) => downloadBlob(blob, chordFilename(saved)))
+      .catch((err) => console.error(err))
+      .finally(() => setSavingImage(false));
+  };
+
+  const where = songTitle ? `Adding to ${songTitle}` : 'Adding a chord';
+
   return (
     <div className="editor">
       <div className="editor-bar">
-        <button type="button" className="icon-btn accent" onClick={onCancel} aria-label="Back">
+        <button type="button" className="icon-btn accent" onClick={leave} aria-label="Back">
           <CaretLeft size={20} />
         </button>
         <span className="editor-context">
-          {songTitle ? `Adding to ${songTitle}` : 'Working out a chord'}
+          {chordCount > 0 ? `${where} · ${chordCount} in` : where}
         </span>
-        <button type="button" className="btn-ghost" onClick={onCancel}>
-          Skip
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={saveImage}
+          disabled={empty || unnamed || savingImage}
+          aria-label="Save this chord as an image"
+          title="Save as an image"
+        >
+          <DownloadSimple size={20} />
         </button>
       </div>
 
@@ -214,16 +257,50 @@ export default function ChordEditor({
         </div>
       </div>
 
-      <div className="editor-action">
+      <div className="editor-action editor-actions">
+        <button type="button" className="btn-secondary btn-block" onClick={leave}>
+          Back
+        </button>
         <button
           type="button"
           className="btn-primary btn-block"
           disabled={empty || unnamed}
           onClick={() => onSave({ ...spec, name: name.trim() })}
         >
-          That's the one
+          Save
         </button>
       </div>
+
+      {confirmingLeave && (
+        <>
+          <button
+            type="button"
+            className="scrim"
+            aria-label="Keep editing"
+            onClick={() => setConfirmingLeave(false)}
+          />
+          <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+            <i className="grab" />
+            <h2 id="leave-title">Leave without saving?</h2>
+            <p className="editor-hint">
+              {saved ? 'Your changes to this chord will be lost.' : 'This chord will not be added.'}
+            </p>
+            <div className="editor-actions">
+              <button type="button" className="btn-secondary btn-block" onClick={onCancel}>
+                Discard
+              </button>
+              <button
+                type="button"
+                className="btn-primary btn-block"
+                onClick={() => setConfirmingLeave(false)}
+                autoFocus
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

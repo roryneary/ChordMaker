@@ -6,6 +6,10 @@ const song: Route = { name: 'song', songId: 's1' };
 const editor: Route = { name: 'chordEditor', songId: 's1', chordId: null };
 const library: Route = { name: 'library' };
 const full: Route = { name: 'fullScreen', songId: 's1' };
+const allSongs: Route = { name: 'songs' };
+const playlists: Route = { name: 'playlists' };
+const playlist: Route = { name: 'playlist', playlistId: 'p1' };
+const playlistAdd: Route = { name: 'playlistAdd', playlistId: 'p1' };
 
 const mobile = (route: Route, previous?: Route) => chromeFor(route, false, previous);
 const desktop = (route: Route, previous?: Route) => chromeFor(route, true, previous);
@@ -14,6 +18,40 @@ describe('which chrome a screen gets', () => {
   it('gives mobile browsing screens the tab bar', () => {
     expect(mobile(LANDING)).toBe('tabs');
     expect(mobile(library, LANDING)).toBe('tabs');
+    // Songs is where a phone finds any song but the latest, so it has to be
+    // somewhere you can get to, and away from, by the tabs.
+    expect(mobile(allSongs)).toBe('tabs');
+    expect(mobile(allSongs, LANDING)).toBe('tabs');
+    expect(mobile(playlists)).toBe('tabs');
+  });
+
+  /* One playlist is a list you are reading, like the songs. Adding songs to it
+     is a step with a Done of its own, and a tab bar there is a way to walk off
+     with the ticks unsaved. */
+  it('keeps the tabs on a playlist, and withholds them while adding to one', () => {
+    expect(mobile(playlist, playlists)).toBe('tabs');
+    expect(mobile(playlist, allSongs)).toBe('tabs');
+    expect(mobile(playlistAdd, playlist)).toBe('none');
+  });
+
+  /* The shared songs are somewhere you browse; one of them is where a link
+     lands, with one thing to do, and a tab bar under "Keep this song" is an
+     invitation to wander off before doing it. */
+  it('keeps the tabs on the shared songs, and withholds them from one', () => {
+    expect(mobile({ name: 'shared' }, allSongs)).toBe('tabs');
+    expect(mobile({ name: 'sharedSong', shareId: 'sh1' }, LANDING)).toBe('none');
+    expect(desktop({ name: 'sharedSong', shareId: 'sh1' })).toBe('sidebar');
+  });
+
+  /* Opening the library from the song list is going somewhere, not pausing
+     half-way through a song — without this it lost its tab bar and grew a
+     Back button, because anything that was not the landing page counted as
+     "inside an edit". */
+  it('keeps the library a destination when it is reached from a browsing screen', () => {
+    expect(mobile(library, allSongs)).toBe('tabs');
+    expect(libraryIsStep(allSongs)).toBe(false);
+    expect(libraryIsStep(playlists)).toBe(false);
+    expect(libraryIsStep(playlist)).toBe(false);
   });
 
   /* While editing one song you are not navigating, and the tab bar competes
@@ -50,6 +88,8 @@ describe('which chrome a screen gets', () => {
     expect(desktop(LANDING)).toBe('sidebar');
     expect(desktop(song)).toBe('sidebar');
     expect(desktop(library, editor)).toBe('sidebar');
+    expect(desktop(allSongs)).toBe('sidebar');
+    expect(desktop(playlistAdd, playlist)).toBe('sidebar');
     expect(desktop(full)).toBe('none');
   });
 

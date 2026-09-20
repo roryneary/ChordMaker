@@ -1,31 +1,55 @@
 import {
-  BagSimple,
   GridFour,
-  MusicNotesSimple,
+  House,
+  MusicNotes,
+  Playlist,
   PlusCircle,
+  UserCircle,
 } from '@phosphor-icons/react';
 import type { Route } from '../../app/routes';
+import type { Account } from '../../hooks/useAuth';
 
 interface Props {
+  account: Account | null;
   route: Route;
   onGo: (route: Route) => void;
   onStart: () => void;
 }
 
+/* Each tab is named for what is behind it. There was a "Gig bag" here, which
+   was the song list under a name that had to be explained; it is "Songs" now,
+   and playlists have a tab of their own rather than a section inside it. */
 const ITEMS = [
-  { key: 'songs', label: 'Songs', Icon: MusicNotesSimple },
+  { key: 'home', label: 'Home', Icon: House },
   { key: 'start', label: 'Start', Icon: PlusCircle },
   { key: 'chords', label: 'Chords', Icon: GridFour },
-  { key: 'bag', label: 'Gig bag', Icon: BagSimple },
+  { key: 'songs', label: 'Songs', Icon: MusicNotes },
+  { key: 'playlists', label: 'Playlists', Icon: Playlist },
 ] as const;
 
 /**
  * Browsing screens only. It is deliberately absent while editing a song —
  * you are not navigating then, and it competes with the screen's primary action.
+ *
+ * The account tab is the mobile equivalent of the sidebar's chip at the foot
+ * of the desktop nav — without it there was no way to reach sign-in on a
+ * phone at all, only the sidebar had the door in.
  */
-export default function TabBar({ route, onGo, onStart }: Props) {
+export default function TabBar({ account, route, onGo, onStart }: Props) {
   const activeKey =
-    route.name === 'library' ? 'chords' : route.name === 'landing' ? 'songs' : '';
+    route.name === 'library'
+      ? 'chords'
+      : route.name === 'landing'
+        ? 'home'
+        : /* Shared songs has no tab of its own — six is what fits — and is
+             reached from Songs, so that is the tab it sits under. */
+          route.name === 'songs' || route.name === 'shared'
+          ? 'songs'
+          : route.name === 'playlists' || route.name === 'playlist'
+            ? 'playlists'
+            : route.name === 'signIn'
+              ? 'account'
+              : '';
 
   return (
     <nav className="tab-bar" aria-label="Main">
@@ -40,6 +64,8 @@ export default function TabBar({ route, onGo, onStart }: Props) {
             onClick={() => {
               if (key === 'start') onStart();
               else if (key === 'chords') onGo({ name: 'library' });
+              else if (key === 'songs') onGo({ name: 'songs' });
+              else if (key === 'playlists') onGo({ name: 'playlists' });
               else onGo({ name: 'landing' });
             }}
           >
@@ -48,6 +74,15 @@ export default function TabBar({ route, onGo, onStart }: Props) {
           </button>
         );
       })}
+      <button
+        type="button"
+        className={`tab-item${activeKey === 'account' ? ' is-active' : ''}`}
+        aria-current={activeKey === 'account' ? 'page' : undefined}
+        onClick={() => onGo({ name: 'signIn' })}
+      >
+        <UserCircle size={21} weight={account?.handle ? 'fill' : 'regular'} />
+        <span>{account?.handle ? 'Account' : 'Sign in'}</span>
+      </button>
     </nav>
   );
 }

@@ -1,21 +1,55 @@
-import { useState } from 'react';
-import { BagSimple, CaretLeft, PaperPlaneTilt, Printer } from '@phosphor-icons/react';
+import { type ComponentProps, useState } from 'react';
+import {
+  CaretLeft,
+  Copy,
+  ImageSquare,
+  PaperPlaneTilt,
+  Printer,
+  ShareNetwork,
+} from '@phosphor-icons/react';
 import CapoChip from '../components/CapoChip';
 import ChordDiagram from '../components/ChordDiagram';
 import LyricBlock from '../components/lyric/LyricBlock';
+import ShareLinkSheet from '../components/ShareLinkSheet';
+import { changedSinceShared } from '../lib/sharedSong';
+import { type ExportJob, canCopyImages, canShareFiles } from '../lib/share';
 import type { Song } from '../types/song';
 
 interface Props {
   song: Song;
   nameOf: (chordId: string) => string | null;
   onClose: () => void;
-  onPrint: () => Promise<void> | void;
-  printing: boolean;
+  /** Which export is running, if any. One at a time: they share a canvas's worth of work. */
+  busy: ExportJob | null;
+  onPrint: () => void;
+  onShareChords: () => void;
+  onSaveChordsImage: () => void;
+  onCopyChords: () => void;
+  /** Sending the whole song as a link: everything `ShareLinkSheet` needs but the song. */
+  sharing: Omit<ComponentProps<typeof ShareLinkSheet>, 'song' | 'onClose'>;
 }
 
 /** M06. The finished song, with the share sheet over it. */
-export default function Ready({ song, nameOf, onClose, onPrint, printing }: Props) {
+export default function Ready({
+  song,
+  nameOf,
+  onClose,
+  busy,
+  onPrint,
+  onShareChords,
+  onSaveChordsImage,
+  onCopyChords,
+  sharing,
+}: Props) {
   const [sheetOpen, setSheetOpen] = useState(true);
+  const [linkOpen, setLinkOpen] = useState(false);
+  /* Asked once. A row the device cannot honour is not offered at all, rather
+     than offered and then apologised for. */
+  const [canShare] = useState(canShareFiles);
+  const [canCopy] = useState(canCopyImages);
+  // The picture is of the chords, so with none there is nothing to send.
+  const noChords = song.chords.length === 0;
+  const chordsHint = (otherwise: string) => (noChords ? 'Add a chord first' : otherwise);
   const meta = [
     song.chords.length ? `${song.chords.length} chords` : null,
     song.key ? `key of ${song.key}` : null,
@@ -85,32 +119,84 @@ export default function Ready({ song, nameOf, onClose, onPrint, printing }: Prop
             <i className="grab" />
             <h2>Where&apos;s it going?</h2>
 
+            {canShare && (
+              <button
+                type="button"
+                className="share-row"
+                onClick={onShareChords}
+                disabled={busy !== null || noChords}
+              >
+                <ShareNetwork size={22} />
+                <span>
+                  <strong>{busy === 'share' ? 'Drawing the chords…' : 'Send the chords'}</strong>
+                  <em>{chordsHint('One picture of every shape, straight into a chat')}</em>
+                </span>
+              </button>
+            )}
+
             <button
               type="button"
               className="share-row"
-              onClick={() => void onPrint()}
-              disabled={printing}
+              onClick={onSaveChordsImage}
+              disabled={busy !== null || noChords}
+            >
+              <ImageSquare size={22} />
+              <span>
+                <strong>
+                  {busy === 'image' ? 'Drawing the chords…' : 'Save the chords as a picture'}
+                </strong>
+                <em>{chordsHint('The title, the capo and every shape, easy to read')}</em>
+              </span>
+            </button>
+
+            {canCopy && (
+              <button
+                type="button"
+                className="share-row"
+                onClick={onCopyChords}
+                disabled={busy !== null || noChords}
+              >
+                <Copy size={22} />
+                <span>
+                  <strong>{busy === 'copy' ? 'Copying…' : 'Copy the chords'}</strong>
+                  <em>{chordsHint('Paste the picture into a message')}</em>
+                </span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="share-row"
+              onClick={onPrint}
+              disabled={busy !== null}
             >
               <Printer size={22} />
               <span>
-                <strong>{printing ? 'Building the page…' : 'Print for the stand'}</strong>
+                <strong>{busy === 'print' ? 'Building the page…' : 'Print for the stand'}</strong>
                 <em>One A4 page, big enough to read standing up</em>
               </span>
             </button>
 
-            <button type="button" className="share-row" disabled>
+            {/* There was a third row here, "Keep it in the gig bag", disabled
+                and explaining that the song was already saved. The gig bag is
+                the song list, and every song is in it from its first tap, so
+                the row offered nothing and is gone. */}
+            <button
+              type="button"
+              className="share-row"
+              onClick={() => {
+                setSheetOpen(false);
+                setLinkOpen(true);
+              }}
+            >
               <PaperPlaneTilt size={22} />
               <span>
-                <strong>Send it to someone</strong>
-                <em>A link that opens without the app — not built yet</em>
-              </span>
-            </button>
-
-            <button type="button" className="share-row" disabled>
-              <BagSimple size={22} />
-              <span>
-                <strong>Keep it in the gig bag</strong>
-                <em>Already saved on this device, and works with no signal</em>
+                <strong>{song.shared ? 'Shared — send the link again' : 'Send a link to the band'}</strong>
+                <em>
+                  {changedSinceShared(song)
+                    ? 'You have changed it since you shared it'
+                    : 'The whole song, opening without an account'}
+                </em>
               </span>
             </button>
 
@@ -119,6 +205,17 @@ export default function Ready({ song, nameOf, onClose, onPrint, printing }: Prop
             </button>
           </div>
         </>
+      )}
+
+      {linkOpen && (
+        <ShareLinkSheet
+          song={song}
+          {...sharing}
+          onClose={() => {
+            setLinkOpen(false);
+            setSheetOpen(true);
+          }}
+        />
       )}
     </div>
   );

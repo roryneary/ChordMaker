@@ -40,6 +40,70 @@ export function groupByLine(words: Word[], lines: number): Word[][] {
   return out;
 }
 
+const isBlank = (line: string): boolean => line.trim() === '';
+
+/** Blank lines a tidy could take out — what the words editor's button counts. */
+export const blankLineCount = (text: string): number =>
+  text.trim() ? text.split('\n').filter(isBlank).length : 0;
+
+/**
+ * Takes the blank lines out of a pasted lyric, and tries not to take the verse
+ * breaks with them.
+ *
+ * A lyrics site very often double-spaces everything: a blank after every line,
+ * two or more between verses. There the single blanks are noise and the longer
+ * runs are the structure, so every gap loses the noise and what is left of it is
+ * capped at one line. A lyric that is not double-spaced has nothing to tell the
+ * two apart by, so its blanks all go. Either way a press always removes
+ * something, and pressing again after the first case takes the verse breaks too.
+ *
+ * Blank lines before the first words and after the last always go. No word is
+ * touched and none changes order, so `retokenise` carries every id across and
+ * placed chords stay where they are.
+ */
+export function removeBlankLines(text: string): string {
+  const lines = text.split('\n');
+  const content: string[] = [];
+  /** `gaps[i]` is how many blank lines sat between `content[i]` and the next. */
+  const gaps: number[] = [];
+  let run = 0;
+  for (const line of lines) {
+    if (isBlank(line)) {
+      run++;
+      continue;
+    }
+    if (content.length) gaps.push(run);
+    content.push(line);
+    run = 0;
+  }
+  if (!content.length) return '';
+
+  const noise = gaps.length ? Math.min(...gaps) : 0;
+  const out: string[] = [];
+  content.forEach((line, i) => {
+    out.push(line);
+    if (i < gaps.length && noise > 0 && gaps[i] > noise) out.push('');
+  });
+  return out.join('\n');
+}
+
+/**
+ * The first `limit` lines *with words on them*, blank gaps kept between them
+ * for spacing but never spending the budget. Used to build a short preview
+ * (`SongScreen`'s three-line card) without a leading or interspersed blank
+ * line — extremely common in anything pasted from a lyrics site — burning the
+ * whole preview on gaps and showing nothing.
+ */
+export function firstLinesWithContent(lines: Word[][], limit: number): Word[][] {
+  const out: Word[][] = [];
+  let withContent = 0;
+  for (const line of lines) {
+    out.push(line);
+    if (line.length > 0 && ++withContent >= limit) break;
+  }
+  return out;
+}
+
 /**
  * Longest common subsequence over the two word sequences, as a map from index
  * in `b` to the index in `a` it matches. Anything unmatched in `b` is genuinely
