@@ -541,6 +541,7 @@ function Router() {
             onReady={() => go({ name: 'ready', songId: song.id })}
             onCapo={(capo) => dispatch({ type: 'SET_CAPO', id: song.id, capo })}
             onTitle={(title) => dispatch({ type: 'SET_TITLE', id: song.id, title })}
+            onArtist={(artist) => dispatch({ type: 'SET_ARTIST', id: song.id, artist })}
             onPlace={(wordId, chordId) =>
               dispatch({ type: 'PLACE_CHORD', id: song.id, wordId, chordId })
             }

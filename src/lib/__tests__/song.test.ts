@@ -475,6 +475,45 @@ describe('the capo', () => {
   });
 });
 
+describe('who plays it', () => {
+  it('starts absent, so a song nobody has named is not a song by ""', () => {
+    expect(newSong('Harbour Lights').artist).toBeUndefined();
+    expect('artist' in newSong('Harbour Lights')).toBe(false);
+  });
+
+  it('keeps what is typed, and round-trips it', () => {
+    const { store, id } = storeWithSong();
+    const named = songsReducer(store, { type: 'SET_ARTIST', id, artist: 'The Harbour Band' });
+    expect(named.songs[0].artist).toBe('The Harbour Band');
+    expect(parseStore(serializeStore(named))!.songs[0].artist).toBe('The Harbour Band');
+  });
+
+  it('drops the field when it is rubbed out, rather than storing an empty name', () => {
+    const { store, id } = storeWithSong();
+    const named = songsReducer(store, { type: 'SET_ARTIST', id, artist: 'The Harbour Band' });
+    const cleared = songsReducer(named, { type: 'SET_ARTIST', id, artist: '   ' });
+    expect('artist' in cleared.songs[0]).toBe(false);
+    expect('artist' in parseStore(serializeStore(cleared))!.songs[0]).toBe(false);
+  });
+
+  it('is quiet when the name did not change, so the account is not written to again', () => {
+    const { store, id } = storeWithSong();
+    const named = songsReducer(store, { type: 'SET_ARTIST', id, artist: 'Dylan' });
+    const again = songsReducer(named, { type: 'SET_ARTIST', id, artist: 'Dylan' });
+    expect(again).toBe(named);
+    // And a song nobody has named is not touched by clearing what is not there.
+    expect(songsReducer(store, { type: 'SET_ARTIST', id, artist: '' })).toBe(store);
+  });
+
+  it('reads a stored name of the wrong shape as nobody having said', () => {
+    const { store, id } = storeWithSong();
+    const named = songsReducer(store, { type: 'SET_ARTIST', id, artist: 'Dylan' });
+    const raw = JSON.parse(serializeStore(named)) as { songs: { artist: unknown }[] };
+    raw.songs[0].artist = 42;
+    expect(parseStore(JSON.stringify(raw))!.songs[0].artist).toBeUndefined();
+  });
+});
+
 describe('newSong', () => {
   it('starts empty but tokenises to nothing rather than undefined', () => {
     const song = newSong('Untitled');

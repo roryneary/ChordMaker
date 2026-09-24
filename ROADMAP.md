@@ -34,10 +34,9 @@ Playlists have landed (see Done). What is left, in order:
 
 1. **Make Songs findable.** The order was changed to put this *before* more playlist work: a
    playlist picker over a list you cannot search, with no artist, is as poor as the list itself.
-   - `artist`, optional, following the `capo` precedent in `src/types/song.ts` — absent is a
-     meaningful state, so no migration. Shown on the card and the playlist row. **It needs a
-     line in `firestore.rules` too** (`validSong`'s field list), or every save is refused — the
-     rules name a song's fields now. The same goes for every field in items 5 and 6.
+   - ~~`artist`~~ — landed 2026-09-24, see Done. The rules were changed with it; **they have to be
+     deployed before the bundle that writes the field**, or every save of every song is refused
+     (§0a says why, and in what order). The same goes for every field in items 5 and 6.
    - Search over title and artist on the Songs screen, the query kept across reloads. `matchesQuery`
      in `src/lib/playlists.ts` is the start of it (title only, used by the add-songs step); it
      should move to a module of its own when it grows.
@@ -64,6 +63,9 @@ Playlists have landed (see Done). What is left, in order:
    themselves (they list in creation order); "add all from another playlist"; putting the same
    song in twice from the UI (the model allows it, the screens do not offer it).
 5. **`learningStatus` and links**, as optional fields like `artist`. Deliberately not early.
+   **`writer` belongs here too** — strictly a song has one, and it is not always the artist. It
+   was left out of step 1 on purpose: one line under a title has room for one name, and the name
+   a song gets reached for by is the performer. Same shape as `artist` when it is wanted.
 6. **Attachments**, only if missed. They need Cloud Storage, which §2 below deliberately avoids.
 
 Also worth doing when it is felt: a way to see or recover **stashed songs and playlists** without
@@ -370,6 +372,23 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   capo-relative would silently reinterpret every chord already saved.
 
 ## Done
+
+- **Songs say who plays them.** `Song.artist`, optional, absent when nobody has said — the
+  `capo` shape, so no migration. Typed under the name on the song screen in both layouts, and
+  shown wherever songs are listed: it leads `songSubLine`, so the card on Songs and the home
+  screen, the playlist row and the add-songs row all gained it at once. Also on "Ready for the
+  room", on a shared song's screen and on the printed A4 sheet (in the line under the title
+  rather than as a subtitle of its own — `a4SheetLayout` counts the lines that fit one page).
+  It travels in the share payload, so a copy arrives knowing whose song it is.
+  Blank is never stored: `SET_ARTIST` drops the key, and `isBlankSong` now counts a typed
+  artist, so a song with a name for its artist and nothing else is not binned when you back out.
+  **`firestore.rules` changed with it** — `validMusic`, `validSong`'s field list and the shared
+  copy's — and **must be deployed before the bundle that writes the field**.
+  **Checked 2026-09-24** in headless Chrome at 390 px and 1280 px: the field under the title on
+  both layouts, the sub-line reading "Jimi Hendrix · 2 chords in · capo on the 2nd" with the
+  count still leading for a song with nobody named, the Ready screen's line, and no page errors.
+  **Not yet checked:** the printed PDF, a shared copy end to end, and the rules themselves
+  (no Java on this machine, so no emulator — they are deployed and checked by hand).
 
 - **The app says which build it is running.** `Version 1.0.0 · 1f5bd8e · 20 Sep 2026`, at the
   foot of the sidebar and on the account screen — the one screen that is about the app rather

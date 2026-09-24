@@ -142,6 +142,9 @@ export async function songToPdfBlob(
   // An unanswered capo prints nothing rather than "Capo not set": the sheet on
   // the stand states what is true of the song, and that is a fact about the app.
   const meta = [
+    // Who plays it, on the line under the title rather than as a subtitle of its
+    // own: the sheet has one page and `a4SheetLayout` counts the lines that fit.
+    song.artist?.trim(),
     song.key && `Key of ${song.key}`,
     song.feel,
     capoChosen(song.capo) && capoLabel(song.capo),

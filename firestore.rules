@@ -46,6 +46,9 @@ service cloud.firestore {
      */
     function validMusic(s) {
       return s.title is string && s.title.size() <= 200
+        // Who plays it, absent when nobody has said (src/types/song.ts). The 200
+        // is `MAX_ARTIST_CHARS` in `src/lib/sharedSong.ts`.
+        && (!('artist' in s) || (s.artist is string && s.artist.size() <= 200))
         && s.key is string && s.key.size() <= 100
         && s.feel is string && s.feel.size() <= 100
         && (!('capo' in s) || s.capo == null || s.capo is number)
@@ -56,8 +59,9 @@ service cloud.firestore {
     }
 
     function validSong(s, songId) {
-      return s.keys().hasOnly(['id', 'title', 'key', 'feel', 'capo', 'chords', 'lyric', 'words',
-                               'placements', 'shared', 'copiedFrom', 'createdAt', 'updatedAt'])
+      return s.keys().hasOnly(['id', 'title', 'artist', 'key', 'feel', 'capo', 'chords', 'lyric',
+                               'words', 'placements', 'shared', 'copiedFrom', 'createdAt',
+                               'updatedAt'])
         && s.id == songId
         && validMusic(s)
         && (!('shared' in s) || s.shared is map)
@@ -168,8 +172,8 @@ service cloud.firestore {
           && d.songId is string
           && d.version is int
           && d.song is map
-          && d.song.keys().hasOnly(['title', 'key', 'feel', 'capo', 'chords', 'lyric', 'words',
-                                    'placements'])
+          && d.song.keys().hasOnly(['title', 'artist', 'key', 'feel', 'capo', 'chords', 'lyric',
+                                    'words', 'placements'])
           && validMusic(d.song)
           && d.publishedAt is number && d.updatedAt is number;
       }

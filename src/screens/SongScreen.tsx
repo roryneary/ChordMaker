@@ -22,7 +22,12 @@ import { useIsDesktop } from '../components/shell/useBreakpoint';
 import { ordinal } from '../lib/numerals';
 import { lineCount, unchordedLineCount } from '../lib/lyric';
 import type { Membership } from '../lib/playlists';
-import { MAX_TITLE_CHARS, changedSinceShared, senderLabel } from '../lib/sharedSong';
+import {
+  MAX_ARTIST_CHARS,
+  MAX_TITLE_CHARS,
+  changedSinceShared,
+  senderLabel,
+} from '../lib/sharedSong';
 import type { SyncView } from '../lib/syncStatus';
 import type { SharedSong } from '../types/sharedSong';
 import type { SavedChord, Song } from '../types/song';
@@ -39,6 +44,8 @@ interface Props {
   onCapo: (capo: number | null) => void;
   onPlace: (wordId: string, chordId: string | null) => void;
   onTitle: (title: string) => void;
+  /** Who plays it. Blank clears it — see the reducer's SET_ARTIST. */
+  onArtist: (artist: string) => void;
   /** The sender's newer version of this song, when there is one to offer. */
   update: SharedSong | null;
   /** The two answers to it. There is no third, blended one: see lib/sharedSong.ts. */
@@ -74,6 +81,7 @@ export default function SongScreen({
   onCapo,
   onPlace,
   onTitle,
+  onArtist,
   update,
   onReplaceMine,
   onKeepMine,
@@ -121,6 +129,26 @@ export default function SongScreen({
       setPicking(null);
     },
     [picking, onPlace],
+  );
+
+  /**
+   * Who plays it, under the name in both layouts. It belongs with the title
+   * rather than among the chips below, because it is part of naming a song —
+   * and it is quieter than the title on purpose: most songs are reached for by
+   * name, and an empty second box must not read as an unanswered question the
+   * way the capo chip deliberately does.
+   */
+  const artistField = (
+    <input
+      className="artist-input"
+      value={song.artist ?? ''}
+      onChange={(e) => onArtist(e.target.value)}
+      maxLength={MAX_ARTIST_CHARS}
+      placeholder="Who plays it?"
+      aria-label="Artist"
+      autoComplete="off"
+      spellCheck={false}
+    />
   );
 
   const chordCell = (chord: SavedChord, big: boolean) => (
@@ -435,17 +463,20 @@ export default function SongScreen({
         <header className="song-head">
           <p className="kicker">You&apos;re building</p>
           <div className="song-head-row">
-            <input
-              className="title-input display-md"
-              value={song.title}
-              onChange={(e) => onTitle(e.target.value)}
-              autoFocus={fresh}
-              maxLength={MAX_TITLE_CHARS}
-              placeholder="Name this song"
-              aria-label="Song title"
-              autoComplete="off"
-              spellCheck={false}
-            />
+            <div className="song-head-titles">
+              <input
+                className="title-input display-md"
+                value={song.title}
+                onChange={(e) => onTitle(e.target.value)}
+                autoFocus={fresh}
+                maxLength={MAX_TITLE_CHARS}
+                placeholder="Name this song"
+                aria-label="Song title"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {artistField}
+            </div>
             <div className="song-actions-d">
               <button type="button" className="btn-secondary" onClick={finish}>
                 <Printer size={15} />
@@ -524,6 +555,7 @@ export default function SongScreen({
             autoComplete="off"
             spellCheck={false}
           />
+          {artistField}
           <span className="song-titles-sub">
             {meta && <em>{meta}</em>}
             {meta && <i className="divider-dot" />}

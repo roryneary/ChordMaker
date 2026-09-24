@@ -114,6 +114,7 @@ export default function SharedSongScreen({ shareId, songs, onKeep, onOpenSong, o
   const nameOf = (chordId: string) =>
     song.chords.find((c) => c.id === chordId)?.spec.name.trim() || null;
   const meta = [
+    song.artist?.trim() || null,
     song.chords.length ? `${song.chords.length} chords` : null,
     song.key ? `key of ${song.key}` : null,
     song.feel || null,

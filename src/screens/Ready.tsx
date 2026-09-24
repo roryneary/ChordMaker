@@ -51,6 +51,7 @@ export default function Ready({
   const noChords = song.chords.length === 0;
   const chordsHint = (otherwise: string) => (noChords ? 'Add a chord first' : otherwise);
   const meta = [
+    song.artist?.trim() || null,
     song.chords.length ? `${song.chords.length} chords` : null,
     song.key ? `key of ${song.key}` : null,
   ]

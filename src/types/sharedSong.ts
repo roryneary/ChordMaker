@@ -9,7 +9,7 @@ import type { Song } from './song';
  */
 export type SharePayload = Pick<
   Song,
-  'title' | 'key' | 'feel' | 'capo' | 'chords' | 'lyric' | 'words' | 'placements'
+  'title' | 'artist' | 'key' | 'feel' | 'capo' | 'chords' | 'lyric' | 'words' | 'placements'
 >;
 
 /**

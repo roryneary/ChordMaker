@@ -29,6 +29,7 @@ function harbourLights(): Song {
   const words = tokenise(lyric);
   return {
     ...newSong('Harbour Lights'),
+    artist: 'The Harbour Band',
     capo: 2,
     chords: [{ id: 'c1', spec: spec('G') }],
     lyric,
@@ -56,8 +57,13 @@ describe('what travels', () => {
   it('carries the music and nothing about whose library it was in', () => {
     const payload = toSharePayload(harbourLights());
     expect(Object.keys(payload).sort()).toEqual(
-      ['capo', 'chords', 'feel', 'key', 'lyric', 'placements', 'title', 'words'].sort(),
+      ['artist', 'capo', 'chords', 'feel', 'key', 'lyric', 'placements', 'title', 'words'].sort(),
     );
+  });
+
+  it('carries who plays it, and carries "nobody has said" as nothing at all', () => {
+    expect(toSharePayload(harbourLights()).artist).toBe('The Harbour Band');
+    expect('artist' in toSharePayload(newSong('Nobody named'))).toBe(false);
   });
 
   it('leaves an unanswered capo unanswered, rather than answering it', () => {

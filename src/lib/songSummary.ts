@@ -2,9 +2,20 @@ import type { Song } from '../types/song';
 import { ordinal } from './numerals';
 import { senderLabel } from './sharedSong';
 
-/** "Five chords in · capo on the 2nd" — the line under a song's name in any list. */
+/**
+ * "Bob Dylan · 5 chords in · capo on the 2nd" — the line under a song's name in
+ * any list. One function, so the song card, the playlist row and the add-songs
+ * row all say the same thing about a song.
+ *
+ * Who plays it leads. In a list it is what tells two songs of the same name
+ * apart, and it is what somebody scanning for a song actually remembers; the
+ * counts behind it are detail. A song with nobody named simply starts at the
+ * count, as every song did before the field existed.
+ */
 export function songSubLine(song: Song): string {
   const bits: string[] = [];
+  const artist = song.artist?.trim();
+  if (artist) bits.push(artist);
   const n = song.chords.length;
   if (n) bits.push(`${n} chord${n === 1 ? '' : 's'} in`);
   if (song.capo) bits.push(`capo on the ${ordinal(song.capo)}`);
@@ -14,12 +25,19 @@ export function songSubLine(song: Song): string {
 }
 
 /**
- * No name, no words, no chords: what a start card leaves behind when it is
- * tapped and backed out of. The capo is not counted — an answer to "which
+ * No name, no artist, no words, no chords: what a start card leaves behind when
+ * it is tapped and backed out of. The capo is not counted — an answer to "which
  * fret?" about a song with nothing in it is not something anyone would miss.
+ * Who plays it is, because it is text somebody typed, and typed text is not
+ * something this may throw away quietly.
  */
 export function isBlankSong(song: Song): boolean {
-  return !song.title.trim() && !song.lyric.trim() && song.chords.length === 0;
+  return (
+    !song.title.trim() &&
+    !song.artist?.trim() &&
+    !song.lyric.trim() &&
+    song.chords.length === 0
+  );
 }
 
 /* There is deliberately no "how far along is it" tag. There was one — "Just

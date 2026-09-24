@@ -83,6 +83,8 @@ export type SongsAction =
   /** The song has been walked away from. Deletes it if there is nothing in it. */
   | { type: 'DISCARD_IF_BLANK'; id: string }
   | { type: 'SET_TITLE'; id: string; title: string }
+  /** Who plays it. Blank clears the field rather than storing '' — see types/song.ts. */
+  | { type: 'SET_ARTIST'; id: string; artist: string }
   | { type: 'SET_META'; id: string; key?: string; feel?: string }
   | { type: 'SET_CAPO'; id: string; capo: number | null }
   | { type: 'SET_LYRIC'; id: string; lyric: string }
@@ -401,6 +403,21 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
 
     case 'SET_TITLE':
       return editSong(store, action.id, (s) => ({ ...s, title: action.title }));
+
+    case 'SET_ARTIST':
+      return editSong(store, action.id, (s) => {
+        /* Cleared to nothing is "nobody has said", which is the absent key, not
+           an empty string: a song that has never been asked and one whose artist
+           was rubbed out are the same song. Every keystroke comes through here,
+           so it also has to be quiet when nothing changed — an unchanged song
+           returned as-is is what stops a bump of `updatedAt` (and so a write to
+           the account) for a field that did not move. */
+        const artist = action.artist.trim() ? action.artist : undefined;
+        if (s.artist === artist) return s;
+        const next = { ...s, artist };
+        if (artist === undefined) delete next.artist;
+        return next;
+      });
 
     case 'SET_META':
       return editSong(store, action.id, (s) => ({

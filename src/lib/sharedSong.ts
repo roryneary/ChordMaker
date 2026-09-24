@@ -23,17 +23,22 @@ import { parseSong } from './storage';
    Firestore's 1 MiB. `firestore.rules` holds the same numbers, and refuses
    what these let through: keep the two in step. */
 export const MAX_TITLE_CHARS = 200;
+/** The same as a title's: the longest real band name is nowhere near either. */
+export const MAX_ARTIST_CHARS = 200;
 export const MAX_LYRIC_CHARS = 20_000;
 export const MAX_WORDS = 5_000;
 export const MAX_CHORDS = 100;
 
 /** Why the account would refuse this song, in words for the player; null if it would not. */
-export function tooBigToSave(song: Pick<Song, 'title' | 'lyric' | 'words' | 'chords'>): string | null {
+export function tooBigToSave(
+  song: Pick<Song, 'title' | 'artist' | 'lyric' | 'words' | 'chords'>,
+): string | null {
   if (song.lyric.length > MAX_LYRIC_CHARS || song.words.length > MAX_WORDS) {
     return 'These words are too long to save to your account. Split the song in two.';
   }
   if (song.chords.length > MAX_CHORDS) return 'That is more chords than one song can hold.';
   if (song.title.length > MAX_TITLE_CHARS) return 'That title is too long to save.';
+  if ((song.artist?.length ?? 0) > MAX_ARTIST_CHARS) return 'That artist name is too long to save.';
   return null;
 }
 
@@ -42,6 +47,9 @@ export function tooBigToSave(song: Pick<Song, 'title' | 'lyric' | 'words' | 'cho
 export function toSharePayload(song: Song): SharePayload {
   return {
     title: song.title,
+    // Absent stays absent, like the capo below: "nobody has said who plays it"
+    // is as true for whoever takes the song as it was for its owner.
+    ...(song.artist === undefined ? {} : { artist: song.artist }),
     key: song.key,
     feel: song.feel,
     // Carried as it is, absent included: an unanswered capo is still

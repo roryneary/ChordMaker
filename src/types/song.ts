@@ -62,6 +62,19 @@ export interface CopiedFrom {
 export interface Song {
   id: string;
   title: string;
+  /**
+   * Who plays it — "Bob Dylan". Optional, the `capo` precedent: absent means
+   * nobody has said, and every song saved before the field existed reads
+   * correctly without it, so there is no migration. Blank is never stored — the
+   * reducer drops the key when the field is cleared — so absent is the single
+   * way of not knowing.
+   *
+   * Deliberately the performer and not the writer: it is what a song gets
+   * reached for by ("that Dylan one"), and the one line under a title in a list
+   * has room for one name. A `writer` can follow this same shape if it is
+   * missed (ROADMAP.md §0.5).
+   */
+  artist?: string;
   /** Displayed as "Key of G". Free text — the design shows a letter, not an enum. */
   key: string;
   /** Displayed as "steady". A word, deliberately, not a BPM number. */

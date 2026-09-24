@@ -280,6 +280,26 @@ the capo does not pull the question out from under the finger that answered it.
 Songs saved before the third state existed carry `capo: null` and read as already decided —
 `parseSong` keeps a stored `null` rather than collapsing it, which is the whole migration.
 
+**Who plays it** is `Song.artist`, optional, and **absent means nobody has said** — the capo's
+shape, and the capo's reason for needing no migration: a song saved before the field existed
+reads correctly without it. Blank is never stored. `SET_ARTIST` drops the key when the box is
+cleared, so not knowing has exactly one representation and no song row is ever by "". It leads
+`songSubLine`, the single line under a song's name on the card, the playlist row and the
+add-songs row — in a list it is what tells two songs of the same name apart — and it travels
+with a shared song, so a copy arrives knowing whose song it is. It is deliberately the
+**performer, not the writer**: it is what a song gets reached for by, and one line under a title
+has room for one name; a `writer` can follow the same shape if it is missed.
+
+It is typed under the name on the song screen, in both layouts, in a field a step quieter than
+the title with no underline until it is pointed at — most songs will leave it empty, and a line
+under an empty box reads as an unanswered question, which is what the capo chip is for and this
+is not. Because it is typed text, `isBlankSong` counts it: a song with an artist and nothing
+else is no longer binned when you back out of it.
+
+Adding it needed **a line in `firestore.rules`** as well — `validMusic`, and both field lists,
+the song's and the shared copy's. Without that, every save of every song is refused, which is
+what these rules do whenever a field is added on one side only.
+
 ## The mark, and the opening
 
 The brand pack's mark is two nested C arcs. `src/components/Brand.tsx` carries the canonical

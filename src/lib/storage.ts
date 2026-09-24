@@ -231,6 +231,9 @@ export function parseSong(x: unknown): Song | null {
   return {
     id: raw.id,
     title: str(raw.title),
+    // Blank reads as absent: nobody has said who plays it, and one state for
+    // "not known" is what keeps a sub-line from reading "· · five chords in".
+    ...(str(raw.artist).trim() ? { artist: str(raw.artist) } : {}),
     key: str(raw.key),
     feel: str(raw.feel),
     // Three states, so the null a song was *saved* with survives the trip and
