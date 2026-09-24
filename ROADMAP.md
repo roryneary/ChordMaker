@@ -44,8 +44,8 @@ Playlists have landed (see Done). What is left, in order:
    - ~~Delete a song~~ — landed 2026-09-20, see Done.
 2. **Play a playlist.** Full screen reading that steps to the next and previous song in the set —
    further than StreetPerformer goes. This is the part of "sessions" worth keeping, without any of
-   the recording. Tapping a song in a playlist opens the builder today, which is the wrong screen
-   for someone about to play it; this is what fixes that.
+   the recording. **Half done 2026-09-25:** tapping a song in a playlist now plays it (every list
+   does — see Done, "Opening a song plays it"). What is left is next and previous while reading.
 3. **Import from StreetPerformer.** Probably the real adoption blocker: the repertoire lives
    there. It has no export, so this is a one-off read of its Firestore: songs, the `lyrics/v1`
    document per song, playlists and their items. Title, artist, capo and playlists map directly.
@@ -342,8 +342,6 @@ actually felt, not before.
 Carried over from the README's "Not built" section — deliberately deferred, not forgotten:
 
 - **A real chord speller.** Names are matched against `chordLibrary` and stay user-editable.
-- **Left-handed mirroring.** `layout.ts` is the only place that converts string number to
-  x position, so the flip has one home.
 - **Other instruments.** Would generalise the 6-string assumption in `layout.ts` and `shape.ts`.
 - **Finger numbers in the dots.** `Dot` already carries an optional `finger` the reducer ignores.
 - **One Firestore write per keystroke.** `useSongs` sends work the moment `unsynced` changes,
@@ -372,6 +370,44 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   capo-relative would silently reinterpret every chord already saved.
 
 ## Done
+
+**Landed 2026-09-25, and the rules must be deployed first.** `firestore.rules` changed twice in
+this batch: `users/{uid}` now allows a `prefs` map (`validPrefs`), and a song and a shared copy
+allow `notes`. **Deploy the rules, then push the bundle** — the other way round, every save of a
+song with a note, and every signed-in pref change, is refused. No Java here, so they were reviewed
+by eye; check by hand that an ordinary song still saves, a song with a note saves, a pref change
+signed in writes `users/{me}.prefs` with exactly the four keys, and an extra key inside `prefs` is
+refused.
+
+- **Opening a song plays it; a shared link does too.** Songs, Home, a playlist and the sidebar
+  open the reading view, with Edit in its top bar (`openSong`, `playOrEdit`); a song with nothing
+  to read opens to be filled in. A shared link opens ready to play with "Add to my songs" under it,
+  which lands on the new copy, still playing, and signed out says once that signing in would put
+  it on every device. The reading view's text size goes down to half, is remembered, and scales
+  the line gaps with it; "Fill the screen" uses the browser's own full screen where it is allowed.
+  README, "Screens" and "Sharing a song".
+- **How you play: left-handed, chords on their side, text size**, as the player's prefs
+  (`lib/prefs.ts`), synced through the profile document. Chords are drawn the viewer's way round —
+  the data is the same for everyone — everywhere, including the editor and what is printed or
+  saved. Closes "Left-handed mirroring" from Later. README, "How you play" and the orientation
+  paragraph under "How it holds together".
+  *Open:* whether "Send the chords" to the band should always go upright and right-handed, rather
+  than the sender's way round. Today it follows the sender, like everything else.
+- **Arrange the chords** a song pins at the top: earlier/later arrows, and "Order as played" by
+  the first word each chord is on (`lib/chordOrder.ts`). `REORDER_CHORD` existed and nothing
+  dispatched it; a move that goes nowhere is now no edit.
+- **Notes on a song**: how to play it, strumming, picking, each free text, optionally tied to a
+  word. README, "Notes".
+  **Checked 2026-09-25** in headless Chrome at 390 px and 1280 px, signed out: songs opening to
+  play from Songs; a blank song opening to edit; Edit and Back; the text size stepping to 50% and
+  surviving a reload; Fill the screen offered on desktop Chrome; Arrange and Order as played; a
+  note put on a word from its sheet, marked, and shown under its line; the notes panel; all four
+  orientations in the settings preview, the reading strip and the editor, with a tap landing on
+  the right string and fret sideways; no page errors. That run found, and the batch fixed, a note
+  typed in the word sheet being lost when Done closed it without a blur.
+  **Not yet checked:** anything signed in (prefs syncing between two devices; a shared link end
+  to end, which needs Firebase); the printed PDF with notes; a real phone, including "Fill the
+  screen" on Android and its absence on an iPhone; drag-to-barre on a sideways plate.
 
 - **Songs say who plays them.** `Song.artist`, optional, absent when nobody has said — the
   `capo` shape, so no migration. Typed under the name on the song screen in both layouts, and

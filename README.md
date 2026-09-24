@@ -64,6 +64,20 @@ reader labels and focus rings come for free. Press-and-drag lays a barre; a tap 
 components. String numbering follows guitar convention: 1 = high E, 6 = low E, and string 6
 draws **leftmost**. Left-to-right conversion happens only in `layout.ts`, guarded by a test.
 
+**Which way round a chord is drawn belongs to the player looking at it, not to the chord.**
+A chord is stored one way for everybody; a left-hander who writes a song and a right-hander
+who plays it read the same copy, each drawn their own way. So there is no field on a chord and
+no migration — the player's prefs (below, "How you play") hand an `Orient` to the renderer.
+Everything in `layout.ts` still describes the canonical diagram, upright and right-handed, and
+every drawn point goes through one function, `place`, on its way out: mirrored across the
+strings for a left-hander; turned so the neck runs across like tab — nut on the left, string 1
+(the thinnest) on top — when sideways; and both, with the nut on the right. The box stays
+`122 × 122` every way round, which is what lets the containers, the PNG and the PDF size a
+turned chord exactly as they size an upright one. Text is **placed, never transformed**: a
+mirrored "VII" is unreadable, so the numeral keeps its column upright and sits under the first
+fret sideways (`labelAt`). The editor's buttons go through the same mapping, so a left-hander
+taps out a chord on their own mirror image and it is stored exactly as a right-hander's would be.
+
 ## Chords stay attached to words
 
 The lyric is one raw string with its line breaks preserved verbatim; a blank line is a gap on
@@ -125,6 +139,20 @@ editor has one Save, which returns to the song — a second "Save, add another" 
 cleared the plate in place was removed because two saves on one screen confused more than the
 round trip cost. Back (the arrow at the top, or the button beside Save) leaves
 without saving, and asks first if the chord has changed (`chordChanged` in `lib/chordEdits.ts`).
+
+**Opening a song plays it.** From Songs, Home, a playlist or the sidebar, a song opens in the
+reading view, with **Edit** one tap on in its top bar — pushed, so Back from the song screen
+comes back to playing. A song is opened to play far more often than to be changed, and every
+list used to open the builder, which is the wrong screen for someone about to play. The rule is
+`playOrEdit`: a song with words or chords plays; one with nothing to read yet opens to be filled
+in. The reading view shows a song with chords and no words as a grid of big diagrams. Starting a
+song, and coming back from its editors, still go to the song screen.
+
+The reading view's text size is nine steps (`TEXT_SCALES`), from half the drawn size, which gets
+most of a song on a phone at once, and it is the player's, remembered. The gaps between lines
+shrink with the words, and chord names stop at 10px. **Fill the screen** uses the browser's own
+full screen — no address bar, no tabs — and is drawn only where the page is allowed to ask
+(`document.fullscreenEnabled`; an iPhone is not, outside video).
 
 **"Play it" is a named button, because full screen is the point of the app.** On a phone the
 song screen's action bar holds both ways out in words — "Play it", the wider half, and "Share
@@ -230,6 +258,48 @@ shape back (the shape, not the name — two voicings of G are both "G"), and the
 which would be one editor on top of another. Otherwise it is a place. The route for a chord of
 your own, `myChord`, is looked through by `openSongId` like the library is, so that reaching it
 with a blank song underneath can never get that song thrown away.
+
+## How you play
+
+Left-handed, chords on their side, and the reading view's text size are **the player's, not a
+song's** (`lib/prefs.ts`, `usePrefs`). They are kept in `localStorage`, read first like songs, so
+a signed-out player has them and nothing waits on a signal. Signed in, they are mirrored to
+`users/{uid}.prefs` — the profile document that holds the handle, which `useAuth` already
+watches, so they arrive with it. When it is read the copy changed last wins, and if that is this
+device's it goes up; a change is sent as it is made, and a failure is not surfaced, because prefs
+are not work. Only a finished account (one with a handle) syncs them: the rules will not let the
+profile be written without one.
+
+They live on a screen of their own, **How you play** (`#/settings`), reached from the sidebar,
+the phone's account screen, and a button on Songs — which also carries a switch for chords on
+their side, the one pref that changes the page you are looking at. Everything drawn follows
+them, including what is printed and saved: what you send is what you see.
+
+## Notes
+
+A song carries **notes on how to play it**: `Song.notes`, optional and absent when there are
+none — the `artist` shape, so no migration. Each is free text of one of three kinds: *how to
+play it*, *strumming*, or *picking*. Patterns are kept apart because they are read differently —
+set in a fixed-width face everywhere they appear, so "D DU UDU" and a line of tab keep their
+columns.
+
+A note can be **tied to a word**, the way a chord is (`wordId`), which is how a note is about
+one part of the song: it survives lyric edits because `retokenise` keeps the ids, and it shows
+where that word is. Tapping a word on the song screen offers it — always now, not only once the
+song has chords — and a word carrying a note is marked. The one difference from a placement: **a
+note whose word is edited out is not dropped** (`pruneNoteWords`). A placement is a pointer; a
+note is something somebody wrote, so it loses its word and becomes one about the whole song.
+
+A note is saved when its box is left, not per keystroke — a note is a sentence, and a write per
+letter would tell everyone holding a copy about every letter — and also when the box goes away
+unsaved, because a tap on Done is not guaranteed to blur it first. Saving it unchanged is no
+edit, as with a chord.
+
+The reading view opens the song's own notes in a panel at the top of the words, open until
+closed (remembered per device), and prints a word's note under its line, where it is read
+mid-song. Notes travel with a shared song — most of what a bandmate needs — count against a blank
+song being thrown away, and print on the A4 sheet, where `a4SheetLayout` counts them so the
+sheet still fits one page.
 
 ## Playlists
 
@@ -370,6 +440,12 @@ list, what a legal handle is) and they are tested; keep its pattern and the one 
 in step.
 
 ## Sharing a song
+
+**A link opens ready to play.** Whoever follows it lands in the reading view, as a song of
+their own opens, with **Add to my songs** under the words — no account needed, as before. Adding
+lands on their new copy, still playing, and signed out it says once, never as a wall, that
+signing in would put it on every device. The owner, or someone who already has a copy, gets a
+way into theirs instead.
 
 **A song is never opened up to a second person. It is copied out.** `users/{uid}/…` is
 readable by that uid and nobody else, with no exceptions, and that one fact is what makes an
@@ -543,7 +619,7 @@ until those domains are added.
 ## Not built
 
 A real chord speller (names are recognised against the library and
-stay user-editable), left-handed mirroring, other instruments, and finger numbers in the dots —
+stay user-editable), other instruments, and finger numbers in the dots —
 though `Dot` already carries an optional `finger` field the reducer ignores.
 
 **Capo does not change the diagrams.** They stay absolute and the capo is shown as a chip.
