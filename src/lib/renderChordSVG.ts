@@ -10,7 +10,6 @@ import {
   GRID_LEFT,
   GRID_W,
   LABEL_SIZE,
-  LABEL_X,
   LINE_W,
   MARKER_ALPHA,
   MARKER_Y,
@@ -30,10 +29,15 @@ import {
   RING_ALPHA,
   RING_R,
   STRING_COUNT,
+  type Orient,
+  UPRIGHT,
   VB_H,
   VB_W,
   dotY,
   fretLineY,
+  labelAt,
+  place,
+  placeRect,
   stringX,
 } from './layout';
 import { ordinal, toRoman } from './numerals';
@@ -50,6 +54,8 @@ export interface RenderOpts {
   accent?: string | null;
   /** The just-placed finger: a lighter dot plus a halo. Cleared on next interaction. */
   active?: StringNumber | null;
+  /** Which way round to draw it, for the player looking (lib/prefs.ts). Upright, right-handed if omitted. */
+  orient?: Orient;
 }
 
 /**
@@ -76,7 +82,22 @@ const n = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2).replace
 const SANS = "Inter, system-ui, -apple-system, sans-serif";
 
 export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
-  const { mode, scale = 1, ink, paper = null, accent = null, active = null } = opts;
+  const { mode, scale = 1, ink, paper = null, accent = null, active = null, orient = UPRIGHT } = opts;
+  /* Everything is worked out on the canonical upright diagram and turned on the
+     way out, so the numbers in layout.ts stay the only numbers. */
+  const line = (x1: number, y1: number, x2: number, y2: number, attrs = '') => {
+    const [ax, ay] = place(x1, y1, orient);
+    const [bx, by] = place(x2, y2, orient);
+    return `<line x1="${n(ax)}" y1="${n(ay)}" x2="${n(bx)}" y2="${n(by)}"${attrs}/>`;
+  };
+  const circle = (x: number, y: number, attrs: string) => {
+    const [cx, cy] = place(x, y, orient);
+    return `<circle cx="${n(cx)}" cy="${n(cy)}" ${attrs}/>`;
+  };
+  const rect = (x: number, y: number, w: number, h: number, attrs: string) => {
+    const r = placeRect(x, y, w, h, orient);
+    return `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" ${attrs}/>`;
+  };
   const fretCount = spec.fretCount;
   const gridBottom = fretLineY(fretCount);
   const showNut = spec.rootFret === MIN_ROOT_FRET;
@@ -102,13 +123,11 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
   // f = 0 is replaced by the nut bar when the window starts at the first fret.
   for (let f = showNut ? 1 : 0; f <= fretCount; f++) {
     const y = fretLineY(f);
-    grid.push(
-      `<line x1="${GRID_LEFT}" y1="${n(y)}" x2="${GRID_LEFT + GRID_W}" y2="${n(y)}"/>`,
-    );
+    grid.push(line(GRID_LEFT, y, GRID_LEFT + GRID_W, y));
   }
   for (let s = 1; s <= STRING_COUNT; s++) {
     const x = stringX(s);
-    grid.push(`<line x1="${n(x)}" y1="${n(fretLineY(0))}" x2="${n(x)}" y2="${n(gridBottom)}"/>`);
+    grid.push(line(x, fretLineY(0), x, gridBottom));
   }
   parts.push(
     `<g stroke="${ink}" stroke-opacity="${GRID_ALPHA}" stroke-width="${LINE_W}">` +
@@ -116,18 +135,16 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
   );
 
   if (showNut) {
-    parts.push(
-      `<rect x="${NUT_X}" y="${NUT_Y}" width="${NUT_W}" height="${NUT_H}" rx="${NUT_R}" ` +
-        `fill="${ink}" fill-opacity="${NUT_ALPHA}"/>`,
-    );
+    parts.push(rect(NUT_X, NUT_Y, NUT_W, NUT_H, `rx="${NUT_R}" fill="${ink}" fill-opacity="${NUT_ALPHA}"`));
   } else {
     /* Up the neck there is no nut, so a roman numeral says which fret the
        window starts on. It sits in the column to the right of string 1, on the
        centre line of the fret it names. That column is reserved on every
        diagram, so carrying a numeral never costs the fretboard any width —
-       see the note on VB_W. */
+       see the note on VB_W. Sideways, it sits under the first fret instead. */
+    const at = labelAt(orient);
     parts.push(
-      `<text x="${LABEL_X}" y="${n(dotY(1))}" text-anchor="start" ` +
+      `<text x="${n(at.x)}" y="${n(at.y)}" text-anchor="${at.anchor}" ` +
         `dominant-baseline="central" fill="${ink}" fill-opacity="${MARKER_ALPHA}" ` +
         `font-family="${SANS}" font-size="${LABEL_SIZE}">${toRoman(spec.rootFret)}</text>`,
     );
@@ -142,17 +159,14 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
     if (marker === 'none' || !marker) continue;
     const x = stringX(s);
     if (marker === 'open') {
-      markers.push(
-        `<circle cx="${n(x)}" cy="${MARKER_Y}" r="${OPEN_R}" fill="none" ` +
-          `stroke-width="${NUT_STROKE_W}"/>`,
-      );
+      markers.push(circle(x, MARKER_Y, `r="${OPEN_R}" fill="none" stroke-width="${NUT_STROKE_W}"`));
     } else {
-      const l = n(x - MUTE_ARM);
-      const r = n(x + MUTE_ARM);
+      const l = x - MUTE_ARM;
+      const r = x + MUTE_ARM;
       markers.push(
         `<g stroke-width="${MUTE_W}" stroke-linecap="round">` +
-          `<line x1="${l}" y1="${MUTE_TOP}" x2="${r}" y2="${MUTE_BOTTOM}"/>` +
-          `<line x1="${l}" y1="${MUTE_BOTTOM}" x2="${r}" y2="${MUTE_TOP}"/>` +
+          line(l, MUTE_TOP, r, MUTE_BOTTOM) +
+          line(l, MUTE_BOTTOM, r, MUTE_TOP) +
           `</g>`,
       );
     }
@@ -167,25 +181,23 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
   for (const barre of spec.barres) {
     const xl = stringX(barre.fromString);
     const xr = stringX(barre.toString);
+    // Between the two, whichever way round they were stored.
+    const left = Math.min(xl, xr);
     parts.push(
-      `<rect x="${n(xl - BARRE_R)}" y="${n(dotY(barre.fret) - BARRE_H / 2)}" ` +
-        `width="${n(xr - xl + BARRE_R * 2)}" height="${BARRE_H}" ` +
-        `rx="${BARRE_R}" ${dotFill}/>`,
+      rect(left - BARRE_R, dotY(barre.fret) - BARRE_H / 2, Math.abs(xr - xl) + BARRE_R * 2, BARRE_H,
+        `rx="${BARRE_R}" ${dotFill}`),
     );
   }
 
   for (const dot of spec.dots) {
     const on = active === dot.string;
-    const cx = n(stringX(dot.string));
-    const cy = n(dotY(dot.fret));
-    parts.push(
-      `<circle cx="${cx}" cy="${cy}" r="${on ? DOT_R_ACTIVE : DOT_R}" ` +
-        `${on ? activeFill : dotFill}/>`,
-    );
+    const x = stringX(dot.string);
+    const y = dotY(dot.fret);
+    parts.push(circle(x, y, `r="${on ? DOT_R_ACTIVE : DOT_R}" ${on ? activeFill : dotFill}`));
     if (on) {
       parts.push(
-        `<circle cx="${cx}" cy="${cy}" r="${RING_R}" fill="none" stroke="${ringStroke}" ` +
-          `stroke-opacity="${RING_ALPHA}" stroke-width="${LINE_W}"/>`,
+        circle(x, y, `r="${RING_R}" fill="none" stroke="${ringStroke}" ` +
+          `stroke-opacity="${RING_ALPHA}" stroke-width="${LINE_W}"`),
       );
     }
   }
@@ -199,7 +211,12 @@ export function renderChordSVG(spec: ChordSpec, opts: RenderOpts): string {
      words. Nothing is said at the nut: that is where a chord is unless told
      otherwise, and the nut bar carries it visually. */
   const named = spec.name.trim() ? `${spec.name.trim()} chord diagram` : 'Chord diagram';
-  const label = showNut ? named : `${named}, ${ordinal(spec.rootFret)} fret`;
+  const turned = [orient.leftHanded && 'left-handed', orient.sideways && 'drawn sideways']
+    .filter(Boolean)
+    .join(', ');
+  const label = [named, showNut ? null : `${ordinal(spec.rootFret)} fret`, turned || null]
+    .filter(Boolean)
+    .join(', ');
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB_W} ${VB_H}"${size} ` +

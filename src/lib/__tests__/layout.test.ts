@@ -9,13 +9,20 @@ import {
   LABEL_SIZE,
   LABEL_X,
   MARKER_ROW_H,
+  MARKER_Y,
   MAX_ROOT_FRET,
+  OPEN_R,
+  type Orient,
+  UPRIGHT,
   VB_H,
   VB_W,
   cellRectPct,
   dotY,
   fretLineY,
+  gridCentreX,
+  labelAt,
   markerRectPct,
+  place,
   stringX,
 } from '../layout';
 import { toRoman } from '../numerals';
@@ -92,5 +99,100 @@ describe('geometry', () => {
     // The band ends at the nut, which sits just above the first fret cell.
     expect((m.height / 100) * VB_H).toBeCloseTo(MARKER_ROW_H);
     expect(m.top + m.height).toBeLessThan(c.top);
+  });
+});
+
+describe('turning the diagram for the player', () => {
+  const ALL: Orient[] = [
+    { leftHanded: false, sideways: false },
+    { leftHanded: true, sideways: false },
+    { leftHanded: false, sideways: true },
+    { leftHanded: true, sideways: true },
+  ];
+
+  it('leaves the upright right-handed diagram exactly as it was', () => {
+    expect(place(stringX(6), dotY(1))).toEqual([stringX(6), dotY(1)]);
+    expect(cellRectPct(3, 2)).toEqual(cellRectPct(3, 2, UPRIGHT));
+  });
+
+  /* The mirror image a left-hander sees of their own neck. */
+  it('puts string 6 on the right for a left-hander', () => {
+    const o = { leftHanded: true, sideways: false };
+    expect(place(stringX(6), 0, o)[0]).toBe(stringX(1));
+    expect(place(stringX(1), 0, o)[0]).toBe(stringX(6));
+    // The numeral column is still clear of the outermost string's dot.
+    expect(place(stringX(6), 0, o)[0] + BARRE_R).toBeLessThan(LABEL_X);
+  });
+
+  /* Like tab: the thinnest string on top, the nut on the left. */
+  it('lays the neck across, thinnest string on top, when sideways', () => {
+    const o = { leftHanded: false, sideways: true };
+    expect(place(stringX(1), 0, o)[1]).toBeLessThan(place(stringX(6), 0, o)[1]);
+    expect(place(0, fretLineY(0), o)[0]).toBeLessThan(place(0, fretLineY(5), o)[0]);
+    // Open and muted marks are on the far side of the nut from the frets.
+    expect(place(0, MARKER_Y, o)[0]).toBeLessThan(place(0, fretLineY(0), o)[0]);
+  });
+
+  it('puts the nut on the right for a left-hander, sideways', () => {
+    const o = { leftHanded: true, sideways: true };
+    expect(place(0, fretLineY(0), o)[0]).toBeGreaterThan(place(0, fretLineY(5), o)[0]);
+    expect(place(stringX(1), 0, o)[1]).toBeLessThan(place(stringX(6), 0, o)[1]);
+  });
+
+  /* The box is the same 122 × 122 every way round, so every container, the
+     PNG and the PDF size a turned chord exactly as they size an upright one. */
+  it('keeps every string, fret, dot and mark inside the same box', () => {
+    for (const o of ALL) {
+      for (let s = 1; s <= 6; s++) {
+        for (const y of [MARKER_Y - OPEN_R, fretLineY(0), fretLineY(5), dotY(5) + DOT_R]) {
+          for (const x of [stringX(s) - DOT_R, stringX(s) + DOT_R]) {
+            const [px, py] = place(x, y, o);
+            expect(px).toBeGreaterThanOrEqual(0);
+            expect(px).toBeLessThanOrEqual(VB_W);
+            expect(py).toBeGreaterThanOrEqual(0);
+            expect(py).toBeLessThanOrEqual(VB_H);
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps the numeral clear of the strings and inside the box, every way round', () => {
+    for (const o of ALL) {
+      const at = labelAt(o);
+      expect(at.y + LABEL_SIZE / 2).toBeLessThanOrEqual(VB_H);
+      if (o.sideways) {
+        // Under the thickest string's dots, which are the lowest thing drawn.
+        expect(at.y - LABEL_SIZE / 2).toBeGreaterThan(place(stringX(6) - DOT_R, 0, o)[1]);
+        // Centred on the first fret's column.
+        expect(at.x).toBeCloseTo(place(0, dotY(1), o)[0]);
+      } else {
+        expect(at.x).toBe(LABEL_X);
+      }
+    }
+  });
+
+  it('lands every overlay button on its own string and fret, every way round', () => {
+    for (const o of ALL) {
+      for (const s of [1, 3, 6]) {
+        for (const f of [1, 4]) {
+          const r = cellRectPct(s, f, o);
+          const cx = ((r.left + r.width / 2) / 100) * VB_W;
+          const cy = ((r.top + r.height / 2) / 100) * VB_H;
+          const [ex, ey] = place(stringX(s), dotY(f), o);
+          expect(cx).toBeCloseTo(ex);
+          expect(cy).toBeCloseTo(ey);
+        }
+      }
+    }
+  });
+
+  it('puts the name over the middle of the fretboard', () => {
+    expect(gridCentreX(UPRIGHT)).toBe(GRID_LEFT + GRID_W / 2);
+    expect(gridCentreX({ leftHanded: true, sideways: false })).toBe(GRID_LEFT + GRID_W / 2);
+    const across = { leftHanded: false, sideways: true };
+    expect(gridCentreX(across)).toBeCloseTo(
+      (place(0, fretLineY(0), across)[0] + place(0, fretLineY(5), across)[0]) / 2,
+    );
   });
 });

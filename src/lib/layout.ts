@@ -100,6 +100,74 @@ export const fretLineY = (f: number) => GRID_TOP + f * CELL_H;
 /** Vertical centre of the cell for relative fret f (1-based). */
 export const dotY      = (f: number) => GRID_TOP + (f - 0.5) * CELL_H;
 
+/**
+ * How a diagram is turned for the player looking at it (lib/prefs.ts). A chord
+ * is stored one way for everybody; this is only how it is drawn.
+ *
+ * Everything above is the canonical diagram — upright, right-handed, string 6
+ * leftmost — and every drawn point goes through `place` on its way out. That
+ * keeps one set of numbers, and one set of tests on them, instead of four.
+ *
+ * - Left-handed, upright: mirrored across the strings, so string 6 is on the
+ *   right, the way a left-hander sees their own neck. The numeral column stays
+ *   on the right: 90 + DOT_R still clears it.
+ * - Sideways: the neck runs across, like tab — nut on the left, string 1 (the
+ *   thinnest) on top, frets running right. The box stays 122 × 122, so nothing
+ *   that sizes a diagram by its width has to know.
+ * - Left-handed, sideways: the same, with the nut on the right.
+ */
+export interface Orient {
+  leftHanded: boolean;
+  sideways: boolean;
+}
+
+export const UPRIGHT: Orient = { leftHanded: false, sideways: false };
+
+/** Mirror line for a left-handed upright diagram: the middle of the strings. */
+const MIRROR_X = GRID_LEFT * 2 + GRID_W;             // 100 → x' = 100 − x
+/** Sideways, string 1 goes on top: canonical x 90 → y' 10. */
+const SIDEWAYS_Y = GRID_LEFT * 2 + GRID_W;           // 100 → y' = 100 − x
+
+/** Where a canonical point lands in the box, for this orientation. */
+export function place(x: number, y: number, o: Orient = UPRIGHT): [number, number] {
+  if (!o.sideways) return [o.leftHanded ? MIRROR_X - x : x, y];
+  return [o.leftHanded ? VB_W - y : y, SIDEWAYS_Y - x];
+}
+
+/** `place` for a rectangle: both corners, then put back in order. */
+export function placeRect(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  o: Orient = UPRIGHT,
+): { x: number; y: number; w: number; h: number } {
+  const [ax, ay] = place(x, y, o);
+  const [bx, by] = place(x + w, y + h, o);
+  return { x: Math.min(ax, bx), y: Math.min(ay, by), w: Math.abs(bx - ax), h: Math.abs(by - ay) };
+}
+
+/**
+ * Where the position numeral goes. Text is placed, never transformed — a
+ * mirrored or turned "VII" would be unreadable. Upright it is in the column to
+ * the right of string 1 on the first fret's centre line (see LABEL_X);
+ * sideways it sits under the neck, centred on the first fret's column.
+ */
+export function labelAt(o: Orient = UPRIGHT): { x: number; y: number; anchor: 'start' | 'middle' } {
+  if (!o.sideways) return { x: LABEL_X, y: dotY(1), anchor: 'start' };
+  const [x] = place(0, dotY(1), o);
+  return { x, y: SIDEWAYS_LABEL_Y, anchor: 'middle' };
+}
+
+/** Sideways, under string 6 (y' 90) and its dots (+ DOT_R), inside the box. */
+export const SIDEWAYS_LABEL_Y = 108;
+
+/** The middle of the fretboard across the box: what a name is centred over. */
+export function gridCentreX(o: Orient = UPRIGHT): number {
+  if (!o.sideways) return GRID_LEFT + GRID_W / 2;
+  return place(0, GRID_TOP + GRID_H / 2, o)[0];
+}
+
 export interface RectPct {
   left: number;
   top: number;
@@ -109,22 +177,19 @@ export interface RectPct {
 
 const pct = (px: number, of: number) => (px / of) * 100;
 
+const rectPct = (r: { x: number; y: number; w: number; h: number }): RectPct => ({
+  left: pct(r.x, VB_W),
+  top: pct(r.y, VB_H),
+  width: pct(r.w, VB_W),
+  height: pct(r.h, VB_H),
+});
+
 /** Hit rect for the cell of string `s` at relative fret `f` (1-based). */
-export function cellRectPct(s: number, f: number): RectPct {
-  return {
-    left:   pct(stringX(s) - CELL_W / 2, VB_W),
-    top:    pct(fretLineY(f - 1), VB_H),
-    width:  pct(CELL_W, VB_W),
-    height: pct(CELL_H, VB_H),
-  };
+export function cellRectPct(s: number, f: number, o: Orient = UPRIGHT): RectPct {
+  return rectPct(placeRect(stringX(s) - CELL_W / 2, fretLineY(f - 1), CELL_W, CELL_H, o));
 }
 
-/** Hit rect for the x/o marker slot above string `s`. */
-export function markerRectPct(s: number): RectPct {
-  return {
-    left:   pct(stringX(s) - CELL_W / 2, VB_W),
-    top:    0,
-    width:  pct(CELL_W, VB_W),
-    height: pct(MARKER_ROW_H, VB_H),
-  };
+/** Hit rect for the x/o marker slot above string `s` — beside the nut, sideways. */
+export function markerRectPct(s: number, o: Orient = UPRIGHT): RectPct {
+  return rectPct(placeRect(stringX(s) - CELL_W / 2, 0, CELL_W, MARKER_ROW_H, o));
 }

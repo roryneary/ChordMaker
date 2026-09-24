@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ChordSpec, StringNumber } from '../types/chord';
 import type { PendingBarre } from '../hooks/useChordSpec';
-import { STRING_COUNT, cellRectPct, markerRectPct } from '../lib/layout';
+import { type RectPct, STRING_COUNT, cellRectPct, markerRectPct } from '../lib/layout';
 import { renderChordSVG } from '../lib/renderChordSVG';
+import { useOrient } from '../hooks/usePrefs';
 
 interface Props {
   spec: ChordSpec;
@@ -110,11 +111,35 @@ export default function ChordPlate({
     [onTapCell],
   );
 
+  /* Drawn the player's way round, as every diagram is: a left-hander taps out
+     a chord on their own mirror image and it is stored exactly as a
+     right-hander's would be. The buttons are placed by the same mapping. */
+  const orient = useOrient();
+  const { leftHanded, sideways } = orient;
+
   // The artwork is drawn by exactly one function; the overlay never draws.
   const svg = useMemo(
-    () => renderChordSVG(spec, { mode: 'screen', ink, active }),
-    [spec, ink, active],
+    () => renderChordSVG(spec, { mode: 'screen', ink, active, orient }),
+    [spec, ink, active, orient],
   );
+
+  /* A marker slot is small, so its button is at least 44px — and it grows away
+     from the fretboard, never over fret 1: up when upright, out past the nut's
+     far side when the neck runs across. */
+  const markerStyle = (r: RectPct): React.CSSProperties => {
+    if (!sideways) {
+      return {
+        left: `${r.left}%`,
+        width: `${r.width}%`,
+        bottom: `${100 - (r.top + r.height)}%`,
+        height: `max(${r.height}%, 44px)`,
+      };
+    }
+    const across = { top: `${r.top}%`, height: `${r.height}%`, width: `max(${r.width}%, 44px)` };
+    return leftHanded
+      ? { ...across, left: `${r.left}%` }
+      : { ...across, right: `${100 - (r.left + r.width)}%` };
+  };
 
   const frets = Array.from({ length: spec.fretCount }, (_, i) => i + 1);
 
@@ -144,21 +169,14 @@ export default function ChordPlate({
       >
         {/* Markers first, so a grid cell wins any overlap in hit-testing. */}
         {STRINGS.map((s) => {
-          const r = markerRectPct(s);
+          const r = markerRectPct(s, orient);
           const state = spec.markers[s - 1] ?? 'none';
           return (
             <button
               key={`m${s}`}
               type="button"
               className="hit hit-marker"
-              // Bottom-anchored so the 44px minimum target grows up into the
-              // title band instead of down over fret 1.
-              style={{
-                left: `${r.left}%`,
-                width: `${r.width}%`,
-                bottom: `${100 - (r.top + r.height)}%`,
-                height: `max(${r.height}%, 44px)`,
-              }}
+              style={markerStyle(r)}
               aria-label={`String ${s} marker, currently ${MARKER_WORD[state]}`}
               onClick={() => onTapMarker(s)}
             />
@@ -167,7 +185,7 @@ export default function ChordPlate({
 
         {STRINGS.map((s) =>
           frets.map((f) => {
-            const r = cellRectPct(s, f);
+            const r = cellRectPct(s, f, orient);
             const isAnchor =
               pendingBarre !== null && pendingBarre.string === s && pendingBarre.fret === f;
             return (

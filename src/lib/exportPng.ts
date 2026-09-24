@@ -1,5 +1,5 @@
 import type { ChordSpec } from '../types/chord';
-import { VB_H, VB_W } from './layout';
+import { type Orient, UPRIGHT, VB_H, VB_W } from './layout';
 import { EXPORT_INK, EXPORT_PAPER } from '../theme/tokens';
 import { renderChordSVG } from './renderChordSVG';
 
@@ -22,8 +22,12 @@ export const chordBox = (_spec: ChordSpec) => ({ w: VB_W, h: VB_H });
  * single-chord PNG export below, the PDF's reference row, and the picture of
  * every chord in a song (exportChordSheet.ts).
  */
-export async function chordToImage(spec: ChordSpec, scale = DEFAULT_SCALE): Promise<HTMLImageElement> {
-  const svg = renderChordSVG(spec, { mode: 'export', scale, ...exportPalette });
+export async function chordToImage(
+  spec: ChordSpec,
+  scale = DEFAULT_SCALE,
+  orient: Orient = UPRIGHT,
+): Promise<HTMLImageElement> {
+  const svg = renderChordSVG(spec, { mode: 'export', scale, orient, ...exportPalette });
   // An explicit charset on the Blob handles names like "C#" without the
   // unescape(encodeURIComponent(...)) data-URI dance.
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
@@ -49,8 +53,13 @@ export function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
-export async function chordToPngBlob(spec: ChordSpec, scale = DEFAULT_SCALE): Promise<Blob> {
-  const img = await chordToImage(spec, scale);
+/** `orient`: the exporting player's way round — what you save is what you see. */
+export async function chordToPngBlob(
+  spec: ChordSpec,
+  orient: Orient = UPRIGHT,
+  scale = DEFAULT_SCALE,
+): Promise<Blob> {
+  const img = await chordToImage(spec, scale, orient);
   const box = chordBox(spec);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(box.w * scale);

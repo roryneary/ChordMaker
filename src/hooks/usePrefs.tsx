@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '../lib/firebase';
+import { UPRIGHT, type Orient } from '../lib/layout';
 import { DEFAULT_PREFS, type Prefs, newerPrefs, parsePrefs, withPref } from '../lib/prefs';
 
 export const PREFS_KEY = 'chord-builder:prefs:v1';
@@ -11,9 +12,19 @@ type Settable = keyof Omit<Prefs, 'updatedAt'>;
 interface PrefsValue {
   prefs: Prefs;
   setPref: <K extends Settable>(key: K, value: Prefs[K]) => void;
+  /**
+   * Who to mirror to, and what their profile holds. `uid` only once the account
+   * is finished (it has a handle), or the rules refuse the write; `remote` is
+   * `useAuth().remotePrefs` — `undefined` until read.
+   */
+  link: (uid: string | null, remote: unknown) => void;
 }
 
-const PrefsContext = createContext<PrefsValue>({ prefs: DEFAULT_PREFS, setPref: () => {} });
+const PrefsContext = createContext<PrefsValue>({
+  prefs: DEFAULT_PREFS,
+  setPref: () => {},
+  link: () => {},
+});
 
 function loadPrefs(): Prefs {
   try {
@@ -34,14 +45,6 @@ function sendPrefs(uid: string, prefs: Prefs) {
   );
 }
 
-interface Props {
-  /** Set once the account is finished (it has a handle), or the rules refuse the write. */
-  uid: string | null;
-  /** `useAuth().remotePrefs`: `undefined` until read, then whatever the profile holds. */
-  remote: unknown;
-  children: ReactNode;
-}
-
 /**
  * One copy of the player's prefs for the whole app — `useThemeValue`'s shape,
  * for the same reason: a hook holding state per component would give each
@@ -52,11 +55,12 @@ interface Props {
  * mirror: when it is read the newer of the two copies is kept, and if that is
  * this device's, it goes up.
  */
-export function PrefsProvider({ uid, remote, children }: Props) {
+export function PrefsProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
-  /* What the two effects and `setPref` compare against: the state as last
-     committed, or as `setPref` has just made it, whichever is later. */
+  /* What `link` and `setPref` compare against: the state as last committed, or
+     as `setPref` has just made it, whichever is later. */
   const latest = useRef(prefs);
+  const uid = useRef<string | null>(null);
 
   useEffect(() => {
     latest.current = prefs;
@@ -67,27 +71,44 @@ export function PrefsProvider({ uid, remote, children }: Props) {
     }
   }, [prefs]);
 
-  useEffect(() => {
-    if (!uid || remote === undefined) return;
+  const link = useCallback((next: string | null, remote: unknown) => {
+    uid.current = next;
+    if (!next || remote === undefined) return;
     const theirs = parsePrefs(remote);
     const kept = newerPrefs(latest.current, theirs);
-    if (kept === theirs) setPrefs(theirs);
-    else if (kept.updatedAt > theirs.updatedAt) sendPrefs(uid, kept);
-  }, [uid, remote]);
+    if (kept === theirs) {
+      latest.current = theirs;
+      setPrefs(theirs);
+    } else if (kept.updatedAt > theirs.updatedAt) {
+      sendPrefs(next, kept);
+    }
+  }, []);
 
-  const setPref = useCallback(
-    <K extends Settable>(key: K, value: Prefs[K]) => {
-      const next = withPref(latest.current, key, value, Date.now());
-      if (next === latest.current) return;
-      latest.current = next;
-      setPrefs(next);
-      if (uid) sendPrefs(uid, next);
-    },
-    [uid],
-  );
+  const setPref = useCallback(<K extends Settable>(key: K, value: Prefs[K]) => {
+    const next = withPref(latest.current, key, value, Date.now());
+    if (next === latest.current) return;
+    latest.current = next;
+    setPrefs(next);
+    if (uid.current) sendPrefs(uid.current, next);
+  }, []);
 
-  const value = useMemo(() => ({ prefs, setPref }), [prefs, setPref]);
+  const value = useMemo(() => ({ prefs, setPref, link }), [prefs, setPref, link]);
   return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;
 }
 
 export const usePrefs = (): PrefsValue => useContext(PrefsContext);
+
+/** Ties the prefs to the account: call once, where the account is known. */
+export function useLinkPrefs(uid: string | null, remote: unknown) {
+  const { link } = usePrefs();
+  useEffect(() => link(uid, remote), [link, uid, remote]);
+}
+
+/** Which way round the player wants a chord drawn, stable while it does not change. */
+export function useOrient(): Orient {
+  const { leftHanded, sideways } = usePrefs().prefs;
+  return useMemo(
+    () => (leftHanded || sideways ? { leftHanded, sideways } : UPRIGHT),
+    [leftHanded, sideways],
+  );
+}

@@ -13,6 +13,7 @@ import { specToShape } from '../lib/shape';
 import { useThemeValue } from '../theme/ThemeProvider';
 import type { ChordSpec, StringNumber } from '../types/chord';
 import type { MyChord } from '../types/myChord';
+import { useOrient } from '../hooks/usePrefs';
 
 interface Props {
   /** What the bar says this chord is for: "Adding to Harbour Lights · 3 in", "A chord of your own". */
@@ -164,11 +165,14 @@ export default function ChordEditor({
     return () => document.removeEventListener('keydown', onKey);
   }, [confirmingLeave]);
 
-  /** One shape as a picture — black on white, whatever the theme on screen. */
+  const orient = useOrient();
+
+  /** One shape as a picture — black on white, whatever the theme on screen,
+      and the player's way round, as it is on the plate above. */
   const saveImage = () => {
     const saved = name.trim();
     setSavingImage(true);
-    chordToPngBlob({ ...spec, name: saved })
+    chordToPngBlob({ ...spec, name: saved }, orient)
       .then((blob) => downloadBlob(blob, chordFilename(saved)))
       .catch((err) => console.error(err))
       .finally(() => setSavingImage(false));

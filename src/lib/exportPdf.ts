@@ -1,5 +1,5 @@
 import type { Placements, Song, Word } from '../types/song';
-import { VB_H, VB_W } from './layout';
+import { type Orient, UPRIGHT, VB_H, VB_W } from './layout';
 import { chordToPngBlob, sanitizeFilename } from './exportPng';
 import { capoChosen, capoLabel } from '../components/CapoChip';
 import { groupByLine, lineCount } from './lyric';
@@ -125,6 +125,7 @@ const blobToDataUrl = (blob: Blob): Promise<string> =>
 export async function songToPdfBlob(
   song: Song,
   nameOf: (chordId: string) => string | null,
+  orient: Orient = UPRIGHT,
 ): Promise<Blob> {
   // jsPDF is ~600 kB; only printing needs it.
   const { jsPDF } = await import('jspdf');
@@ -161,7 +162,7 @@ export async function songToPdfBlob(
   if (shown.length) {
     y += 16;
     const images = await Promise.all(
-      shown.map((c) => chordToPngBlob(c.spec).then(blobToDataUrl)),
+      shown.map((c) => chordToPngBlob(c.spec, orient).then(blobToDataUrl)),
     );
     shown.forEach((chord, i) => {
       const x = MARGIN + i * (CHORD_W + CHORD_GAP);

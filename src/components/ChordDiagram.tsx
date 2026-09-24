@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { ChordSpec, StringNumber } from '../types/chord';
 import { renderChordSVG } from '../lib/renderChordSVG';
 import { useInk } from '../theme/ThemeProvider';
+import { useOrient } from '../hooks/usePrefs';
 
 interface Props {
   spec: ChordSpec;
@@ -19,9 +20,11 @@ interface Props {
  */
 export default function ChordDiagram({ spec, active = null, width, className }: Props) {
   const ink = useInk();
+  // The player's way round (lib/prefs.ts), so every tile, strip and card follows it.
+  const orient = useOrient();
   const svg = useMemo(
-    () => renderChordSVG(spec, { mode: 'screen', ink, active }),
-    [spec, ink, active],
+    () => renderChordSVG(spec, { mode: 'screen', ink, active, orient }),
+    [spec, ink, active, orient],
   );
   return (
     <div

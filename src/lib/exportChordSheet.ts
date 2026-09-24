@@ -1,6 +1,6 @@
 import type { Song } from '../types/song';
 import { capoChosen, capoLabel } from '../components/CapoChip';
-import { GRID_LEFT, GRID_W, VB_H, VB_W } from './layout';
+import { type Orient, UPRIGHT, VB_H, VB_W, gridCentreX } from './layout';
 import { canvasToPngBlob, chordToImage, exportPalette, sanitizeFilename } from './exportPng';
 
 /**
@@ -68,7 +68,7 @@ export interface ChordSheetLayout {
 
 export function chordSheetLayout(
   count: number,
-  opts: { hasMeta?: boolean; columns?: number } = {},
+  opts: { hasMeta?: boolean; columns?: number; orient?: Orient } = {},
 ): ChordSheetLayout {
   const columns = opts.columns ?? SHEET_COLUMNS;
   const width = SHEET_W;
@@ -101,7 +101,7 @@ export function chordSheetLayout(
       y,
       w: cellW,
       h: cellH,
-      nameX: x + (diagramW * (GRID_LEFT + GRID_W / 2)) / VB_W,
+      nameX: x + (diagramW * gridCentreX(opts.orient ?? UPRIGHT)) / VB_W,
       nameBaseline: y + SHEET_NAME_SIZE,
       diagramY: y + nameH,
       diagramW,
@@ -154,9 +154,9 @@ function fitText(
   return `${cut.trimEnd()}…`;
 }
 
-export async function songChordsToPngBlob(song: Song): Promise<Blob> {
+export async function songChordsToPngBlob(song: Song, orient: Orient = UPRIGHT): Promise<Blob> {
   const meta = chordSheetMeta(song);
-  const layout = chordSheetLayout(song.chords.length, { hasMeta: meta.length > 0 });
+  const layout = chordSheetLayout(song.chords.length, { hasMeta: meta.length > 0, orient });
 
   /* The app's font arrives over the network. Drawing before it has loaded
      would quietly set the very first export in the fallback face. Text drawn
@@ -198,16 +198,16 @@ export async function songChordsToPngBlob(song: Song): Promise<Blob> {
   /* Decode every diagram, then draw. `chordToImage` revokes its blob URL once
      `decode()` resolves and the image stays drawable afterwards — the PDF path
      relies on the same thing. */
-  const images = await Promise.all(song.chords.map((c) => chordToImage(c.spec, layout.scale)));
+  const images = await Promise.all(song.chords.map((c) => chordToImage(c.spec, layout.scale, orient)));
 
   ctx.textAlign = 'center';
   layout.cells.forEach((cell, i) => {
     const name = fitText(
       ctx,
       song.chords[i].spec.name.trim() || '—',
-      // Centred left of the box's middle, so the room it has is twice the
-      // distance to the nearer edge.
-      (cell.nameX - cell.x) * 2,
+      // Centred over the strings, which is not the box's middle, so the room
+      // it has is twice the distance to the nearer edge.
+      Math.min(cell.nameX - cell.x, cell.x + cell.w - cell.nameX) * 2,
       500,
       SHEET_NAME_SIZE,
       SHEET_NAME_SIZE * 0.6,

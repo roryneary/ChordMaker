@@ -35,7 +35,7 @@ import { songFilename, songToPdfBlob } from './lib/exportPdf';
 import { chordSheetFilename, songChordsToPngBlob } from './lib/exportChordSheet';
 import { type ExportJob, copyPng, shareFile } from './lib/share';
 import { ThemeProvider } from './theme/ThemeProvider';
-import { PrefsProvider } from './hooks/usePrefs';
+import { PrefsProvider, useLinkPrefs, useOrient } from './hooks/usePrefs';
 import type { ChordSpec } from './types/chord';
 import type { Song } from './types/song';
 
@@ -49,6 +49,12 @@ function Router() {
     auth.account?.uid ?? null,
   );
   const { sharingFor } = useSharing(auth.account, dispatch);
+  /* The prefs follow the account. Only a finished account (one with a handle)
+     can write its profile document, so that is when they start to sync. */
+  useLinkPrefs(auth.signedIn ? (auth.account?.uid ?? null) : null, auth.remotePrefs);
+  /* Exports are drawn the player's way round too: what you print or save is
+     what you see. */
+  const orient = useOrient();
   const { updateFor } = useSharedUpdates(songs, 'songId' in route ? route.songId : null);
   const [busy, setBusy] = useState<ExportJob | null>(null);
   /* The playlist entry to pick out on arrival, when the way in was a song's
@@ -184,61 +190,61 @@ function Router() {
   const print = useCallback(
     (song: Song) =>
       run('print', async () => {
-        const blob = await songToPdfBlob(song, namerFor(song));
+        const blob = await songToPdfBlob(song, namerFor(song), orient);
         downloadBlob(blob, songFilename(song.title));
       }),
-    [run, namerFor],
+    [run, namerFor, orient],
   );
 
   const saveChordsImage = useCallback(
     (song: Song) =>
       run('image', async () => {
-        downloadBlob(await songChordsToPngBlob(song), chordSheetFilename(song.title));
+        downloadBlob(await songChordsToPngBlob(song, orient), chordSheetFilename(song.title));
       }),
-    [run],
+    [run, orient],
   );
 
   /** The phone's share sheet, which is the short way into a chat. */
   const shareChords = useCallback(
     (song: Song) =>
       run('share', async () => {
-        const blob = await songChordsToPngBlob(song);
+        const blob = await songChordsToPngBlob(song, orient);
         const file = new File([blob], chordSheetFilename(song.title), { type: 'image/png' });
         const outcome = await shareFile(file, song.title.trim() || 'Chords');
         // Refused after all: the picture is made, so hand it over the other way.
         if (outcome === 'unsupported') downloadBlob(blob, file.name);
       }),
-    [run],
+    [run, orient],
   );
 
   /* The same three, for one shape: what the Chords tab offers on a chord. */
   const saveChordImage = useCallback(
     (spec: ChordSpec) =>
       run('image', async () => {
-        downloadBlob(await chordToPngBlob(spec), chordFilename(spec.name));
+        downloadBlob(await chordToPngBlob(spec, orient), chordFilename(spec.name));
       }),
-    [run],
+    [run, orient],
   );
   const shareChord = useCallback(
     (spec: ChordSpec) =>
       run('share', async () => {
-        const blob = await chordToPngBlob(spec);
+        const blob = await chordToPngBlob(spec, orient);
         const file = new File([blob], chordFilename(spec.name), { type: 'image/png' });
         const outcome = await shareFile(file, spec.name.trim() || 'Chord');
         if (outcome === 'unsupported') downloadBlob(blob, file.name);
       }),
-    [run],
+    [run, orient],
   );
   const copyChord = useCallback(
     // The promise, not the picture — see copyPng for why that matters to Safari.
-    (spec: ChordSpec) => run('copy', () => copyPng(chordToPngBlob(spec))),
-    [run],
+    (spec: ChordSpec) => run('copy', () => copyPng(chordToPngBlob(spec, orient))),
+    [run, orient],
   );
 
   const copyChords = useCallback(
     // The promise, not the picture — see copyPng for why that matters to Safari.
-    (song: Song) => run('copy', () => copyPng(songChordsToPngBlob(song))),
-    [run],
+    (song: Song) => run('copy', () => copyPng(songChordsToPngBlob(song, orient))),
+    [run, orient],
   );
 
   const landing = (
@@ -647,32 +653,24 @@ function Router() {
   const onGo = useCallback((next: Route) => go(next), [go]);
 
   return (
-    /* Here rather than beside the theme: the prefs follow the account, and the
-       account is known in here. Only a finished account (one with a handle)
-       can write its profile document, so that is when they start to sync. */
-    <PrefsProvider
-      uid={auth.signedIn ? (auth.account?.uid ?? null) : null}
-      remote={auth.remotePrefs}
+    <AppShell
+      account={auth.account}
+      sync={sync}
+      onAccount={() => go({ name: 'signIn' })}
+      onSignOut={auth.signOut}
+      route={route}
+      previous={stack[stack.length - 2]}
+      songs={songs}
+      recent={recentlyOpened}
+      playlistCount={playlists.length}
+      myChordCount={myChords.length}
+      currentId={store.currentId}
+      onGo={onGo}
+      onOpenSong={openSong}
+      onStart={startSong}
     >
-      <AppShell
-        account={auth.account}
-        sync={sync}
-        onAccount={() => go({ name: 'signIn' })}
-        onSignOut={auth.signOut}
-        route={route}
-        previous={stack[stack.length - 2]}
-        songs={songs}
-        recent={recentlyOpened}
-        playlistCount={playlists.length}
-        myChordCount={myChords.length}
-        currentId={store.currentId}
-        onGo={onGo}
-        onOpenSong={openSong}
-        onStart={startSong}
-      >
-        {screen()}
-      </AppShell>
-    </PrefsProvider>
+      {screen()}
+    </AppShell>
   );
 }
 
@@ -681,14 +679,16 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      {/* The app is mounted and laid out from the first frame, behind the
-          splash rather than after it: a crossfade needs both halves moving at
-          once, and a home screen that only began rendering when the splash
-          left would arrive a beat late. */}
-      <div className={`app-root${phase === 'hold' ? ' is-veiled' : ''}`}>
-        <Router />
-      </div>
-      {phase !== 'gone' && <Splash leaving={phase !== 'hold'} onSkip={skip} />}
+      <PrefsProvider>
+        {/* The app is mounted and laid out from the first frame, behind the
+            splash rather than after it: a crossfade needs both halves moving at
+            once, and a home screen that only began rendering when the splash
+            left would arrive a beat late. */}
+        <div className={`app-root${phase === 'hold' ? ' is-veiled' : ''}`}>
+          <Router />
+        </div>
+        {phase !== 'gone' && <Splash leaving={phase !== 'hold'} onSkip={skip} />}
+      </PrefsProvider>
     </ThemeProvider>
   );
 }

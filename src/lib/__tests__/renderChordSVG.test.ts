@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { renderChordSVG } from '../renderChordSVG';
 import { chordFilename, exportPalette } from '../exportPng';
 import { chordReducer, emptySpec } from '../../hooks/useChordSpec';
-import { ACTIVE_ALPHA, DOT_ALPHA, MAX_ROOT_FRET, VB_H, VB_W } from '../layout';
+import { ACTIVE_ALPHA, DOT_ALPHA, MAX_ROOT_FRET, UPRIGHT, VB_H, VB_W } from '../layout';
+import { shapeToSpec } from '../shape';
 
 const INK = '#292b31';
 const screen = { mode: 'screen', ink: INK } as const;
@@ -156,5 +157,49 @@ describe('chordFilename', () => {
     expect(chordFilename('C\\D<E>F|G"H')).toBe('CDEFGH.png');
     expect(chordFilename('   ')).toBe('chord.png');
     expect(chordFilename('x'.repeat(200))).toBe(`${'x'.repeat(60)}.png`);
+  });
+});
+
+describe('drawing a chord the way round the player wants it', () => {
+  const c = () => shapeToSpec('C', 'x32010');
+
+  it('draws the same thing as before when no way round is given', () => {
+    const svg = renderChordSVG(c(), { mode: 'screen', ink: INK });
+    expect(renderChordSVG(c(), { mode: 'screen', ink: INK, orient: UPRIGHT })).toBe(svg);
+  });
+
+  it('draws something different, in the same box, every other way round', () => {
+    const upright = renderChordSVG(c(), { mode: 'screen', ink: INK });
+    for (const orient of [
+      { leftHanded: true, sideways: false },
+      { leftHanded: false, sideways: true },
+      { leftHanded: true, sideways: true },
+    ]) {
+      const svg = renderChordSVG(c(), { mode: 'screen', ink: INK, orient });
+      expect(svg).not.toBe(upright);
+      expect(svg).toContain(`viewBox="0 0 ${VB_W} ${VB_H}"`);
+    }
+  });
+
+  /* A numeral is text, placed, never mirrored or turned. */
+  it('never transforms the numeral', () => {
+    const up = chordReducer(withDot(), { type: 'SET_ROOT_FRET', rootFret: 7 });
+    for (const orient of [
+      { leftHanded: true, sideways: false },
+      { leftHanded: false, sideways: true },
+    ]) {
+      const svg = renderChordSVG(up, { mode: 'screen', ink: INK, orient });
+      expect(svg).not.toContain('transform');
+      expect(svg).toContain('>VII</text>');
+    }
+  });
+
+  it('says which way round it is drawn', () => {
+    const svg = renderChordSVG(c(), {
+      mode: 'screen',
+      ink: INK,
+      orient: { leftHanded: true, sideways: true },
+    });
+    expect(svg).toContain('aria-label="C chord diagram, left-handed, drawn sideways"');
   });
 });
