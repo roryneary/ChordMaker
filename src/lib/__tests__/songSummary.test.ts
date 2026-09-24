@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { isBlankSong, songSubLine } from '../songSummary';
+import { isBlankSong, playOrEdit, songSubLine } from '../songSummary';
 import { newSong } from '../storage';
+import { tokenise } from '../lyric';
 import { emptySpec } from '../../hooks/useChordSpec';
 
 /**
@@ -41,5 +42,19 @@ describe('a song with nothing in it', () => {
     expect(isBlankSong({ ...newSong(''), artist: 'Jimi Hendrix' })).toBe(false);
     expect(isBlankSong({ ...newSong(''), artist: '  ' })).toBe(true);
     expect(isBlankSong(newSong('Angel'))).toBe(false);
+  });
+});
+
+describe('where opening a song goes', () => {
+  it('plays anything with words or chords on it', () => {
+    const lyric = 'Hey Joe';
+    expect(playOrEdit({ ...newSong('Hey Joe'), lyric, words: tokenise(lyric) })).toBe('play');
+    expect(playOrEdit({ ...newSong('Angel'), chords: [chord('E')] })).toBe('play');
+  });
+
+  /* A name alone is nothing to read: the song needs filling in. */
+  it('edits a song with nothing to read on it yet', () => {
+    expect(playOrEdit(newSong('Angel'))).toBe('edit');
+    expect(playOrEdit({ ...newSong('Angel'), artist: 'Jimi Hendrix', capo: 2 })).toBe('edit');
   });
 });

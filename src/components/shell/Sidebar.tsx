@@ -4,6 +4,7 @@ import {
   PencilSimple,
   Playlist,
   PlusCircle,
+  SlidersHorizontal,
   UserCircle,
   UsersThree,
 } from '@phosphor-icons/react';
@@ -31,6 +32,7 @@ interface Props {
   myChordCount: number;
   currentId: string | null;
   onGo: (route: Route) => void;
+  onOpenSong: (songId: string) => void;
   onStart: () => void;
 }
 
@@ -77,6 +79,7 @@ export default function Sidebar({
   myChordCount,
   currentId,
   onGo,
+  onOpenSong,
   onStart,
 }: Props) {
   const inPlaylists =
@@ -132,6 +135,16 @@ export default function Sidebar({
         <UsersThree size={18} />
         <span>Shared songs</span>
       </button>
+      {/* Here as well as on the phone's account screen: signed in, the desktop
+          never opens that screen, and these are the player's, not the account's. */}
+      <button
+        type="button"
+        className={`nav-item${route.name === 'settings' ? ' is-active' : ''}`}
+        onClick={() => onGo({ name: 'settings' })}
+      >
+        <SlidersHorizontal size={18} />
+        <span>How you play</span>
+      </button>
 
       <hr className="nav-rule" />
 
@@ -152,7 +165,7 @@ export default function Sidebar({
               <button
                 type="button"
                 className={`song-row${open ? ' is-open' : ''}`}
-                onClick={() => onGo({ name: 'song', songId: song.id })}
+                onClick={() => onOpenSong(song.id)}
               >
                 <span className="song-row-title">
                   {open && <PencilSimple size={13} weight="fill" />}

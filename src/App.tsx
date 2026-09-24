@@ -12,6 +12,7 @@ import SongScreen from './screens/SongScreen';
 import SharedLibrary from './screens/SharedLibrary';
 import SharedSongScreen from './screens/SharedSongScreen';
 import SignIn from './screens/SignIn';
+import Settings from './screens/Settings';
 import Songs from './screens/Songs';
 import Splash from './screens/Splash';
 import WordsEditor from './screens/WordsEditor';
@@ -23,6 +24,7 @@ import { useAuth } from './hooks/useAuth';
 import { useSharing } from './hooks/useSharing';
 import { useSharedUpdates } from './hooks/useSharedUpdates';
 import { membershipBySong } from './lib/playlists';
+import { playOrEdit } from './lib/songSummary';
 import { recentSongs } from './lib/recent';
 import { firebaseEnabled } from './lib/firebase';
 import { songFromShare } from './lib/sharedSong';
@@ -33,6 +35,7 @@ import { songFilename, songToPdfBlob } from './lib/exportPdf';
 import { chordSheetFilename, songChordsToPngBlob } from './lib/exportChordSheet';
 import { type ExportJob, copyPng, shareFile } from './lib/share';
 import { ThemeProvider } from './theme/ThemeProvider';
+import { PrefsProvider } from './hooks/usePrefs';
 import type { ChordSpec } from './types/chord';
 import type { Song } from './types/song';
 
@@ -52,6 +55,8 @@ function Router() {
      pill. Not in the route: it describes one arrival, and a hash carrying it
      would pick the row out again on every reload and every Back. */
   const [arriveAt, setArriveAt] = useState<string | null>(null);
+  /* A song just added from someone else's link, while signed out. */
+  const [keptHere, setKeptHere] = useState<string | null>(null);
   const arrived = useCallback(() => setArriveAt(null), []);
   /* A shape taken from the library, waiting for the editor we came from to
      pick it up. Cleared as soon as the editor is finished with. */
@@ -136,6 +141,21 @@ function Router() {
   }, [dispatch, go]);
 
   /**
+   * Opening a song plays it: the reading view, with Edit one tap on. A song
+   * with nothing to read yet opens to be filled in instead (`playOrEdit`).
+   * Every list that opens a song comes through here; starting a song, and
+   * coming back from its editors, go straight to the song screen as before.
+   */
+  const openSong = useCallback(
+    (songId: string) => {
+      const song = songs.find((s) => s.id === songId);
+      const where = song && playOrEdit(song) === 'play' ? 'fullScreen' : 'song';
+      go({ name: where, songId });
+    },
+    [songs, go],
+  );
+
+  /**
    * "Keep this song". The copy is made here and is theirs from this line on —
    * a new id, in this library, with or without an account. `replace`, so Back
    * from their new song does not return to an offer they have already taken.
@@ -144,7 +164,11 @@ function Router() {
     (shared: SharedSong) => {
       const id = newId();
       dispatch({ type: 'ADOPT_SONG', song: songFromShare(shared, id) });
-      replace({ name: 'song', songId: id });
+      /* Still playing, now their own copy. Signed out, it lives on this
+         device only, which is worth saying once — `keptHere` is that one
+         arrival, like `arriveAt`, and not in the route. */
+      setKeptHere(id);
+      replace({ name: 'fullScreen', songId: id });
     },
     [dispatch, replace],
   );
@@ -222,7 +246,7 @@ function Router() {
       recent={recentlyOpened}
       songCount={songs.length}
       onStart={startSong}
-      onResume={(songId) => go({ name: 'song', songId })}
+      onResume={openSong}
       onAllSongs={() => go({ name: 'songs' })}
       onFindShared={() => go({ name: 'shared' })}
       /* Offered to someone with no songs here, who may have plenty elsewhere. */
@@ -301,7 +325,7 @@ function Router() {
           <Songs
             songs={songs}
             playlists={playlists}
-            onOpen={(songId) => go({ name: 'song', songId })}
+            onOpen={openSong}
             onOpenPlaylist={({ playlistId, itemId }) => {
               setArriveAt(itemId);
               go({ name: 'playlist', playlistId });
@@ -317,6 +341,7 @@ function Router() {
             updateFor={updateFor}
             sharingFor={sharingFor}
             onSignIn={() => go({ name: 'signIn' })}
+            onSettings={() => go({ name: 'settings' })}
           />
         );
 
@@ -336,7 +361,7 @@ function Router() {
             arriveAt={arriveAt}
             onArrived={arrived}
             onBack={canGoBack ? back : undefined}
-            onOpenSong={(songId) => go({ name: 'song', songId })}
+            onOpenSong={openSong}
             onAddSongs={() => go({ name: 'playlistAdd', playlistId: playlist.id })}
             onRename={(name) => dispatch({ type: 'RENAME_PLAYLIST', id: playlist.id, name })}
             onDelete={() => {
@@ -379,10 +404,20 @@ function Router() {
             songCount={songs.length}
             /* `replace`: Back from Songs should not land on the account again. */
             onOpenSongs={() => replace({ name: 'songs' })}
+            onSettings={() => go({ name: 'settings' })}
             suggestFrom={auth.user?.displayName ?? auth.user?.email ?? null}
             onClaim={auth.claimHandle}
             onDone={back}
             onCancel={back}
+          />
+        );
+
+      case 'settings':
+        return (
+          <Settings
+            signedIn={auth.signedIn}
+            onBack={canGoBack ? back : undefined}
+            onSignIn={() => go({ name: 'signIn' })}
           />
         );
 
@@ -482,7 +517,44 @@ function Router() {
         const song = songFor(route.songId) ?? current;
         if (!song) return landing;
         // Exit returns to the previous screen, not to the landing page.
-        return <FullScreen song={song} nameOf={namerFor(song)} onExit={back} />;
+        const nudge = keptHere === song.id && firebaseEnabled && !auth.user;
+        return (
+          <FullScreen
+            song={song}
+            nameOf={namerFor(song)}
+            onExit={back}
+            /* Never a wall: the song is already theirs, on this device. */
+            action={
+              nudge ? (
+                <div className="kept-nudge" role="status">
+                  <p>Added to your songs on this device. Sign in to have it on every device.</p>
+                  <span>
+                    <button type="button" className="btn-ghost" onClick={() => setKeptHere(null)}>
+                      Not now
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => {
+                        setKeptHere(null);
+                        go({ name: 'signIn' });
+                      }}
+                    >
+                      Sign in
+                    </button>
+                  </span>
+                </div>
+              ) : undefined
+            }
+            /* Pushed, so Back from the song screen comes back to playing —
+               unless the song screen is what is underneath already. */
+            onEdit={() => {
+              const under = stack[stack.length - 2];
+              if (under?.name === 'song' && under.songId === song.id) back();
+              else go({ name: 'song', songId: song.id });
+            }}
+          />
+        );
       }
 
       case 'ready': {
@@ -510,7 +582,7 @@ function Router() {
             shareId={route.shareId}
             songs={songs}
             onKeep={keepShared}
-            onOpenSong={(songId) => replace({ name: 'song', songId })}
+            onOpenSong={(songId) => replace({ name: 'fullScreen', songId })}
             onBack={back}
           />
         );
@@ -571,23 +643,32 @@ function Router() {
   const onGo = useCallback((next: Route) => go(next), [go]);
 
   return (
-    <AppShell
-      account={auth.account}
-      sync={sync}
-      onAccount={() => go({ name: 'signIn' })}
-      onSignOut={auth.signOut}
-      route={route}
-      previous={stack[stack.length - 2]}
-      songs={songs}
-      recent={recentlyOpened}
-      playlistCount={playlists.length}
-      myChordCount={myChords.length}
-      currentId={store.currentId}
-      onGo={onGo}
-      onStart={startSong}
+    /* Here rather than beside the theme: the prefs follow the account, and the
+       account is known in here. Only a finished account (one with a handle)
+       can write its profile document, so that is when they start to sync. */
+    <PrefsProvider
+      uid={auth.signedIn ? (auth.account?.uid ?? null) : null}
+      remote={auth.remotePrefs}
     >
-      {screen()}
-    </AppShell>
+      <AppShell
+        account={auth.account}
+        sync={sync}
+        onAccount={() => go({ name: 'signIn' })}
+        onSignOut={auth.signOut}
+        route={route}
+        previous={stack[stack.length - 2]}
+        songs={songs}
+        recent={recentlyOpened}
+        playlistCount={playlists.length}
+        myChordCount={myChords.length}
+        currentId={store.currentId}
+        onGo={onGo}
+        onOpenSong={openSong}
+        onStart={startSong}
+      >
+        {screen()}
+      </AppShell>
+    </PrefsProvider>
   );
 }
 

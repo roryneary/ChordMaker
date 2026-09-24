@@ -105,6 +105,9 @@ export default function SongScreen({
   const toChord = unchordedLineCount(song.words, song.placements, lines);
   const meta = [song.key && `Key of ${song.key}`, song.feel].filter(Boolean).join(' · ');
   const hasLyric = song.lyric.trim().length > 0;
+  /* The reading view shows chords on their own too, so there is something to
+     play as soon as there is either. */
+  const playable = hasLyric || song.chords.length > 0;
   /* A song with nothing in it yet has just been made, and the first thing it
      needs is a name. autoFocus only acts at mount, which is exactly then — and
      it is what lets a lesson go name, capo, Add without a wasted tap. */
@@ -520,7 +523,7 @@ export default function SongScreen({
               type="button"
               className="btn-primary"
               onClick={onFullScreen}
-              disabled={!hasLyric}
+              disabled={!playable}
             >
               <ArrowsOutSimple size={15} />
               Play it
@@ -590,10 +593,10 @@ export default function SongScreen({
           finishing step you take once. Full screen used to be an unlabelled
           expand icon halfway up the scroll, with "Looks right" the only thing
           named down here — so "how do I play this?" had no answer on the
-          screen. With no words pasted there is nothing to read full screen, so
-          the button is not offered rather than offered and refused. */}
+          screen. With nothing on the song yet there is nothing to read, so the
+          button is not offered rather than offered and refused. */}
       <div className="editor-action editor-actions">
-        {hasLyric && (
+        {playable && (
           <button type="button" className="btn-primary btn-block song-play" onClick={onFullScreen}>
             <ArrowsOutSimple size={16} />
             Play it
@@ -601,11 +604,11 @@ export default function SongScreen({
         )}
         <button
           type="button"
-          className={`${hasLyric ? 'btn-secondary' : 'btn-primary'} btn-block`}
+          className={`${playable ? 'btn-secondary' : 'btn-primary'} btn-block`}
           onClick={finish}
         >
           Share or print
-          {!hasLyric && <ArrowRight size={16} />}
+          {!playable && <ArrowRight size={16} />}
         </button>
       </div>
       {picker}

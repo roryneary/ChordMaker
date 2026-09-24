@@ -24,6 +24,8 @@ interface Props {
   myChordCount: number;
   currentId: string | null;
   onGo: (route: Route) => void;
+  /** Opening a song, which plays it — see `openSong` in App.tsx. */
+  onOpenSong: (songId: string) => void;
   onStart: () => void;
   children: ReactNode;
 }
@@ -54,6 +56,7 @@ const BROWSING: ReadonlyArray<Route['name']> = [
   'playlists',
   'playlist',
   'shared',
+  'settings',
 ];
 
 export function libraryIsStep(previous?: Route): boolean {
@@ -92,6 +95,7 @@ export default function AppShell({
   myChordCount,
   currentId,
   onGo,
+  onOpenSong,
   onStart,
   children,
 }: Props) {
@@ -113,6 +117,7 @@ export default function AppShell({
           myChordCount={myChordCount}
           currentId={currentId}
           onGo={onGo}
+          onOpenSong={onOpenSong}
           onStart={onStart}
         />
       )}

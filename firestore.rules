@@ -100,11 +100,26 @@ service cloud.firestore {
         && c.createdAt is number && c.updatedAt is number;
     }
 
-    // The profile: the claimed handle, written by `claimUsername`.
+    /*
+     * How a player wants things drawn (`src/lib/prefs.ts`): which hand, chords
+     * on their side, the reading view's text size. Not part of any song, which
+     * is why it is here and not in `validSong`.
+     */
+    function validPrefs(p) {
+      return p is map
+        && p.keys().hasOnly(['leftHanded', 'sideways', 'textScale', 'updatedAt'])
+        && p.leftHanded is bool && p.sideways is bool
+        && p.textScale is number && p.textScale > 0 && p.textScale <= 2
+        && p.updatedAt is number;
+    }
+
+    // The profile: the claimed handle, written by `claimUsername`, and the
+    // player's prefs beside it.
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create, update: if isOwner(uid)
-                    && request.resource.data.keys().hasOnly(['handle', 'display', 'updatedAt'])
+                    && request.resource.data.keys().hasOnly(['handle', 'display', 'updatedAt', 'prefs'])
+                    && (!('prefs' in request.resource.data) || validPrefs(request.resource.data.prefs))
                     && request.resource.data.handle is string
                     && request.resource.data.handle.size() <= 24
                     && request.resource.data.display is string

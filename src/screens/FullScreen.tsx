@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowsInSimple, Sun } from '@phosphor-icons/react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowsIn, ArrowsInSimple, ArrowsOut, PencilSimple, Sun } from '@phosphor-icons/react';
 import CapoChip from '../components/CapoChip';
 import ChordDiagram from '../components/ChordDiagram';
+import TextSize from '../components/TextSize';
 import LyricBlock from '../components/lyric/LyricBlock';
 import { useIsDesktop } from '../components/shell/useBreakpoint';
+import { usePrefs } from '../hooks/usePrefs';
 import { groupByLine, lineCount } from '../lib/lyric';
 import type { Song } from '../types/song';
 
@@ -11,19 +13,41 @@ interface Props {
   song: Song;
   nameOf: (chordId: string) => string | null;
   onExit: () => void;
+  /** To the song screen. Absent for a song that is not yours to change yet. */
+  onEdit?: () => void;
+  /** A line over the title, such as whose song this is. */
+  kicker?: ReactNode;
+  /** Above the bottom bar: "Add to my songs", say, for a song someone sent. */
+  action?: ReactNode;
 }
 
 /**
- * Steps, not a slider: you adjust this with a guitar on your knee. The middle
- * one is the default and the size the screen was drawn at. The step below it is
- * for the times you want the next verse on the screen rather than bigger words
- * — a page you can see the shape of beats a page you have to scroll.
+ * The browser's own full screen: no address bar, no tabs, every pixel for the
+ * song. Not every browser lets a page ask (an iPhone does not, outside video),
+ * so where it cannot the button is not drawn rather than drawn and refused.
  */
-const SCALES = [0.78, 1, 1.25] as const;
-const DEFAULT_SCALE = SCALES[1];
+function useFillScreen(): { can: boolean; on: boolean; toggle: () => void } {
+  const can = typeof document !== 'undefined' && document.fullscreenEnabled === true;
+  const [on, setOn] = useState(() => can && !!document.fullscreenElement);
 
-/** Drawn at their own size by `.seg`, so the buttons look like what they do. */
-const SCALE_LABELS = ['A−', 'A', 'A+'] as const;
+  useEffect(() => {
+    if (!can) return;
+    const onChange = () => setOn(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      // Leaving the song leaves full screen: the rest of the app has chrome.
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    };
+  }, [can]);
+
+  const toggle = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    else void document.documentElement.requestFullscreen().catch(() => {});
+  }, []);
+
+  return { can, on, toggle };
+}
 
 /**
  * Keeps the screen awake while the song is open.
@@ -71,11 +95,19 @@ function useWakeLock(active: boolean): boolean {
   return held;
 }
 
-/** M05 / D3. Read the song while playing. No chrome. */
-export default function FullScreen({ song, nameOf, onExit }: Props) {
+/**
+ * M05 / D3. Read the song while playing. No chrome.
+ *
+ * This is where a song opens — from Songs, Home, a playlist, a shared link.
+ * A song is opened to play far more often than to change, so the song screen
+ * is one tap further on, behind Edit.
+ */
+export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, action }: Props) {
   const isDesktop = useIsDesktop();
-  const [scale, setScale] = useState<number>(DEFAULT_SCALE);
+  const scale = usePrefs().prefs.textScale;
   const awake = useWakeLock(true);
+  const fill = useFillScreen();
+  const hasWords = song.words.length > 0;
 
   const base = isDesktop ? { word: 27, chord: 15 } : { word: 23, chord: 14 };
   // The chord scales with the words, holding the ~0.55 ratio.
@@ -108,30 +140,39 @@ export default function FullScreen({ song, nameOf, onExit }: Props) {
   return (
     <div className="fs">
       <div className="fs-top">
-        <button type="button" className="icon-btn" onClick={onExit} aria-label="Leave full screen">
+        <button type="button" className="icon-btn" onClick={onExit} aria-label="Back">
           <ArrowsInSimple size={20} />
         </button>
-        <span className="fs-title">{song.title.trim() || 'Untitled'}</span>
-        <div className="seg" role="group" aria-label="Text size">
-          {SCALES.map((step, i) => (
-            <button
-              key={step}
-              type="button"
-              className={scale === step ? 'is-on' : undefined}
-              onClick={() => setScale(step)}
-              aria-pressed={scale === step}
-            >
-              {SCALE_LABELS[i]}
-            </button>
-          ))}
-        </div>
+        <span className="fs-title">
+          {kicker && <em className="fs-kicker">{kicker}</em>}
+          <span>{song.title.trim() || 'Untitled'}</span>
+        </span>
+        <TextSize />
+        {fill.can && (
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={fill.toggle}
+            aria-label={fill.on ? 'Stop filling the screen' : 'Fill the screen'}
+            title={fill.on ? 'Stop filling the screen' : 'Fill the screen'}
+          >
+            {fill.on ? <ArrowsIn size={19} /> : <ArrowsOut size={19} />}
+          </button>
+        )}
+        {onEdit && (
+          <button type="button" className="btn-ghost fs-edit" onClick={onEdit}>
+            <PencilSimple size={15} />
+            Edit
+          </button>
+        )}
       </div>
 
       {/* The shapes, pinned: outside the scroller, so they are still there at the
           last verse. One row that scrolls sideways rather than wrapping — every
           row it wrapped onto would come straight out of the words, and the words
-          are what the screen is for. Nothing to show, no strip. */}
-      {song.chords.length > 0 && (
+          are what the screen is for. Nothing to show, no strip. With no words the
+          chords are the whole song, and get the page instead (below). */}
+      {song.chords.length > 0 && hasWords && (
         <ul className={`fs-chords${isDesktop ? ' fs-chords-wide' : ''}`} aria-label="The chords">
           {song.chords.map((chord) => (
             <li key={chord.id}>
@@ -142,7 +183,27 @@ export default function FullScreen({ song, nameOf, onExit }: Props) {
         </ul>
       )}
 
-      <div className={`fs-words${isDesktop ? ' fs-wide' : ''}`}>{block}</div>
+      <div className={`fs-words${isDesktop ? ' fs-wide' : ''}`}>
+        {hasWords ? (
+          block
+        ) : (
+          <>
+            <ul className="fs-chords-only" aria-label="The chords">
+              {song.chords.map((chord) => (
+                <li key={chord.id}>
+                  <strong style={{ fontSize: sizes.word }}>{chord.spec.name.trim() || '—'}</strong>
+                  <ChordDiagram spec={chord.spec} />
+                </li>
+              ))}
+            </ul>
+            <p className="fs-no-words">
+              {onEdit ? 'No words on this one yet. Edit to paste them in.' : 'No words on this one.'}
+            </p>
+          </>
+        )}
+      </div>
+
+      {action && <div className="fs-action">{action}</div>}
 
       <div className="fs-bottom">
         <CapoChip capo={song.capo} variant="statement" />

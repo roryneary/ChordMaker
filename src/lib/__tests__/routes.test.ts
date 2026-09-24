@@ -20,6 +20,7 @@ describe('hashes', () => {
       { name: 'shared' },
       { name: 'sharedSong', shareId: 'sh1' },
       { name: 'signIn' },
+      { name: 'settings' },
       song,
       words,
       editor,

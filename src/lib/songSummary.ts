@@ -46,3 +46,13 @@ export function isBlankSong(song: Song): boolean {
    have: a song can be complete with the shapes written into the words by hand,
    or with no words at all, and the tag had no way to know that. Nothing here
    judges a song; `songSubLine` says what is in it and leaves it at that. */
+
+/**
+ * Where opening a song goes. A song is opened to be played far more often than
+ * to be changed, so the reading view is where it lands — unless there is
+ * nothing on it to read yet, no words and no chords, in which case the only
+ * useful thing to do with it is fill it in.
+ */
+export function playOrEdit(song: Song): 'play' | 'edit' {
+  return song.words.length > 0 || song.chords.length > 0 ? 'play' : 'edit';
+}

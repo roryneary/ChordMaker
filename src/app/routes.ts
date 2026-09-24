@@ -31,7 +31,9 @@ export type Route =
      link sent to the band lands. Not under `library`: that is the chord library. */
   | { name: 'shared' }
   | { name: 'sharedSong'; shareId: string }
-  | { name: 'signIn' };
+  | { name: 'signIn' }
+  /** How this player wants things drawn: hand, sideways, text size. See lib/prefs.ts. */
+  | { name: 'settings' };
 
 export const LANDING: Route = { name: 'landing' };
 
@@ -59,6 +61,8 @@ export function toHash(route: Route): string {
       return `#/shared/${route.shareId}`;
     case 'signIn':
       return '#/signin';
+    case 'settings':
+      return '#/settings';
     case 'chordEditor':
       return `#/chord/${route.songId}/${route.chordId ?? 'new'}`;
     case 'words':
@@ -90,6 +94,7 @@ export function fromHash(hash: string): Route {
     return parts[1] ? { name: 'sharedSong', shareId: parts[1] } : { name: 'shared' };
   }
   if (parts[0] === 'signin') return { name: 'signIn' };
+  if (parts[0] === 'settings') return { name: 'settings' };
 
   // `#/chord/new/new` was the song-less editor. A bookmark to it lands home.
   if (parts[0] === 'chord' && parts[1] && parts[1] !== 'new') {

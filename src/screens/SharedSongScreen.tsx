@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, CaretLeft } from '@phosphor-icons/react';
-import CapoChip from '../components/CapoChip';
-import ChordDiagram from '../components/ChordDiagram';
-import LyricBlock from '../components/lyric/LyricBlock';
+import FullScreen from './FullScreen';
 import { firebaseEnabled } from '../lib/firebase';
 import { fetchShared } from '../lib/sharedSongSync';
-import { copyOf, senderLabel } from '../lib/sharedSong';
+import { copyOf, senderLabel, songFromShare } from '../lib/sharedSong';
 import type { SharedSong } from '../types/sharedSong';
 import type { Song } from '../types/song';
 
@@ -33,8 +31,9 @@ type Loaded =
  * id can read. Keeping it makes a song of their own on this device, exactly as
  * if they had typed it; signing in later backs it up like any other.
  *
- * Read-only, and deliberately not the song screen with the controls disabled:
- * this is someone else's song until it is kept, and there is one thing to do.
+ * It opens ready to play — the reading view, as any song of your own opens —
+ * because a song sent to the band is usually sent to be played, tonight. It is
+ * someone else's until it is added, so there is no Edit, and one thing to do.
  */
 export default function SharedSongScreen({ shareId, songs, onKeep, onOpenSong, onBack }: Props) {
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
@@ -108,19 +107,12 @@ export default function SharedSongScreen({ shareId, songs, onKeep, onOpenSong, o
   }
 
   const { shared } = loaded;
-  const song = shared.song;
   const own = songs.find((s) => s.shared?.shareId === shared.id) ?? null;
   const mine = copyOf(songs, shared.id);
+  // Not in the library: only drawn. Its id is never stored anywhere.
+  const song = songFromShare(shared, `preview:${shared.id}`, shared.updatedAt);
   const nameOf = (chordId: string) =>
     song.chords.find((c) => c.id === chordId)?.spec.name.trim() || null;
-  const meta = [
-    song.artist?.trim() || null,
-    song.chords.length ? `${song.chords.length} chords` : null,
-    song.key ? `key of ${song.key}` : null,
-    song.feel || null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
 
   const action = own
     ? { label: 'This is your song — open it', run: () => onOpenSong(own.id), note: null }
@@ -128,56 +120,29 @@ export default function SharedSongScreen({ shareId, songs, onKeep, onOpenSong, o
       ? {
           label: 'Open my copy',
           run: () => onOpenSong(mine.id),
-          note: 'You have already kept this one.',
+          note: 'You have already added this one.',
         }
       : {
-          label: 'Keep this song',
+          label: 'Add to my songs',
           run: () => onKeep(shared),
-          note: 'It becomes yours: on this device, to change however you like.',
+          note: 'It becomes yours, to change however you like.',
         };
 
   return (
-    <div className="ready">
-      {bar}
-      <div className="ready-body">
-        <p className="kicker">from {senderLabel(shared)}</p>
-        <h1 className="display-lg">{song.title.trim() || 'Untitled'}</h1>
-        {meta && <p className="ready-meta">{meta}</p>}
-
-        <CapoChip capo={song.capo} variant="statement" />
-
-        {song.chords.length > 0 && (
-          <ul className="ready-chords">
-            {song.chords.map((c) => (
-              <li key={c.id}>
-                <strong>{c.spec.name.trim() || '—'}</strong>
-                <ChordDiagram spec={c.spec} width={56} />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {song.lyric.trim() && (
-          <>
-            <hr className="rule" />
-            <LyricBlock
-              lyric={song.lyric}
-              words={song.words}
-              placements={song.placements}
-              nameOf={nameOf}
-              sizes={{ word: 18, chord: 12.5 }}
-            />
-          </>
-        )}
-      </div>
-
-      <div className="editor-action">
-        {action.note && <p className="field-note shared-note">{action.note}</p>}
-        <button type="button" className="btn-primary btn-block" onClick={action.run}>
-          {action.label}
-          <ArrowRight size={16} />
-        </button>
-      </div>
-    </div>
+    <FullScreen
+      song={song}
+      nameOf={nameOf}
+      onExit={onBack}
+      kicker={`from ${senderLabel(shared)}${song.artist?.trim() ? ` · ${song.artist.trim()}` : ''}`}
+      action={
+        <>
+          {action.note && <p className="field-note shared-note">{action.note}</p>}
+          <button type="button" className="btn-primary btn-block" onClick={action.run}>
+            {action.label}
+            <ArrowRight size={16} />
+          </button>
+        </>
+      }
+    />
   );
 }

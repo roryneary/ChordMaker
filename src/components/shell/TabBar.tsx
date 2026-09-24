@@ -50,7 +50,7 @@ export default function TabBar({ account, route, onGo }: Props) {
           ? 'songs'
           : route.name === 'playlists' || route.name === 'playlist'
             ? 'playlists'
-            : route.name === 'signIn'
+            : route.name === 'signIn' || route.name === 'settings'
               ? 'account'
               : '';
 

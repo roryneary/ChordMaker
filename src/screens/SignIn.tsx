@@ -28,6 +28,8 @@ interface Props {
   /** How many songs the account screen's chip leads to. */
   songCount: number;
   onOpenSongs: () => void;
+  /** Left-handed, sideways, text size: the player's, reached from their account. */
+  onSettings: () => void;
   suggestFrom?: string | null;
   onClaim: (handle: string) => Promise<string>;
   onDone: () => void;
@@ -53,6 +55,7 @@ export default function SignIn({
   onSignOut,
   songCount,
   onOpenSongs,
+  onSettings,
   suggestFrom,
   onClaim,
   onDone,
@@ -167,6 +170,14 @@ export default function SignIn({
         <p className="user-meta account-sync">
           <SyncLine sync={sync} />
         </p>
+
+        <button type="button" className="user-chip is-action account-settings" onClick={onSettings}>
+          <span className="user-meta">
+            <strong>How you play</strong>
+            <em>Left-handed, chords on their side, text size</em>
+          </span>
+          <CaretRight size={16} />
+        </button>
 
         {error && <p className="signin-error">{error}</p>}
 

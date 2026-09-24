@@ -35,6 +35,9 @@ export interface AuthState {
   /** Signed in, but has not claimed a handle. The sign-in flow is not done. */
   needsHandle: boolean;
   signedIn: boolean;
+  /** `prefs` as the profile document holds it, unparsed: `undefined` until the
+      document has been read, `null` when it has none. See lib/prefs.ts. */
+  remotePrefs: unknown;
   claimHandle: (input: string) => Promise<string>;
   signOut: () => Promise<void>;
 }
@@ -43,12 +46,16 @@ export function useAuth(): AuthState {
   const [loading, setLoading] = useState(firebaseEnabled);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<{ handle: string; display: string } | null>(null);
+  const [remotePrefs, setRemotePrefs] = useState<unknown>(undefined);
 
   useEffect(() => {
     if (!firebaseEnabled) return;
     return onAuthStateChanged(getFirebaseAuth(), (next) => {
       setUser(next);
-      if (!next) setProfile(null);
+      if (!next) {
+        setProfile(null);
+        setRemotePrefs(undefined);
+      }
       setLoading(false);
     });
   }, []);
@@ -65,6 +72,8 @@ export function useAuth(): AuthState {
         setProfile(
           data?.handle ? { handle: data.handle as string, display: (data.display as string) ?? data.handle as string } : null,
         );
+        // The same document carries the player's prefs, so they arrive with it.
+        setRemotePrefs(data?.prefs ?? null);
       },
       // A read that fails (offline, rules) must not strand the app on a
       // spinner — it just means we do not know the handle yet.
@@ -107,6 +116,7 @@ export function useAuth(): AuthState {
     account,
     needsHandle: !!user && !profile,
     signedIn: !!user && !!profile,
+    remotePrefs,
     claimHandle,
     signOut,
   };
