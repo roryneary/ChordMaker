@@ -931,18 +931,12 @@ button.capo-chip.is-unset:hover {
 .sheet-notes { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .sheet-notes > .btn-ghost { align-self: flex-start; margin-left: -8px; }
 
-/* A word with a note on it: a small accent dot over its corner, where it does
-   not move the chord row or the word. */
-.word.has-note { position: relative; }
-.word.has-note::after {
-  content: '';
-  position: absolute;
-  right: -1px;
-  bottom: 0.2em;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-accent);
+/* A word with a note on it: a dotted accent underline, which neither moves
+   the chord row nor sits on a letter the way a dot did. */
+.word.has-note .word-text {
+  text-decoration: underline dotted var(--color-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
 }
 
 /* The reading view: a word's note under its line, and the song's notes in a

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Trash } from '@phosphor-icons/react';
 import { MAX_NOTE_CHARS, NOTE_KINDS, NOTE_KIND_LABEL } from '../lib/notes';
 import type { NoteKind, SongNote, Word } from '../types/song';
@@ -28,6 +28,20 @@ function KindPicker({ kind, onChange }: { kind: NoteKind; onChange: (kind: NoteK
 }
 
 /**
+ * Runs `save` when the box goes away without having been left — the sheet it
+ * is in closed by a button, say. Leaving the box (blur) is the usual way a note
+ * is saved, but a tap on "Done" is not guaranteed to blur it first on every
+ * device, and what was typed must not depend on that.
+ */
+function useSaveOnLeave(save: () => void) {
+  const latest = useRef(save);
+  useEffect(() => {
+    latest.current = save;
+  });
+  useEffect(() => () => latest.current(), []);
+}
+
+/**
  * One note, edited in place. Committed when the box loses focus rather than per
  * keystroke — a note is a sentence, not a title, and a write per letter of it
  * would tell everyone holding a copy about every letter. Rubbing it out and
@@ -44,6 +58,10 @@ export function NoteField({
   where?: string;
 }) {
   const [text, setText] = useState(note.text);
+  // Saving it unchanged is no edit (the reducer's rule), so a second save is harmless.
+  useSaveOnLeave(() => {
+    if (text !== note.text) on.onUpdate(note.id, text);
+  });
   return (
     <div className={`note note-${note.kind}`}>
       <div className="note-head">
@@ -91,8 +109,16 @@ export function NoteDraft({
 }) {
   const [kind, setKind] = useState(initialKind);
   const [text, setText] = useState('');
+  /* Added once, whichever comes first: leaving the box, or the box going away. */
+  const added = useRef(false);
+  const save = () => {
+    if (added.current || !text.trim()) return;
+    added.current = true;
+    onAdd({ id: newId(), kind, text, ...(wordId ? { wordId } : {}) });
+  };
+  useSaveOnLeave(save);
   const commit = () => {
-    if (text.trim()) onAdd({ id: newId(), kind, text, ...(wordId ? { wordId } : {}) });
+    save();
     onDone();
   };
   return (

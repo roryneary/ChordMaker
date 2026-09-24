@@ -136,8 +136,9 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
   const wide = songWideNotes(song.notes);
 
   const base = isDesktop ? { word: 27, chord: 15 } : { word: 23, chord: 14 };
-  // The chord scales with the words, holding the ~0.55 ratio.
-  const sizes = { word: base.word * scale, chord: base.chord * scale };
+  // The chord scales with the words, holding the ~0.55 ratio —
+  // but never below 10px, so at the smallest steps a name is still read at a glance.
+  const sizes = { word: base.word * scale, chord: Math.max(10, base.chord * scale) };
 
   const lines = lineCount(song.lyric);
   const grouped = groupByLine(song.words, lines);
@@ -145,7 +146,9 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
   // One column at every width: a song reads top to bottom, and a second column
   // beside the first looks like a different part of the song.
   const block = (
-    <div className="fs-col">
+    /* The space between lines shrinks with the words: at the small sizes the
+       point is more of the song on the screen, and fixed gaps would spend it. */
+    <div className="fs-col" style={{ gap: Math.round((isDesktop ? 24 : 20) * scale) }}>
       {grouped.map((lineWords, i) =>
         lineWords.length === 0 ? (
           <div key={`g${i}`} className="lyric-gap" aria-hidden="true" />
