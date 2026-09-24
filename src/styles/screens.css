@@ -874,3 +874,108 @@ button.capo-chip.is-unset:hover {
 .chord-move { display: flex; justify-content: center; gap: 2px; }
 .chord-move .icon-btn { width: 32px; height: 32px; }
 .chord-move .icon-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* --- Notes --------------------------------------------------------------- */
+/* Patterns keep their columns: "D DU UDU" and a line of tab are spaced on purpose. */
+.note-strum textarea, .note-picking textarea,
+.line-note.note-strum, .line-note.note-picking,
+.fs-note.note-strum p, .fs-note.note-picking p {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.song-notes { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.note {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 6px 8px 8px;
+}
+.note.is-draft { border-color: var(--color-accent); }
+.note-head { display: flex; align-items: center; gap: 8px; }
+.note-head .spacer { flex: 1; }
+.note-kind {
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-accent);
+  background: transparent;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.note-where {
+  font-style: normal;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.note-remove { width: 30px; height: 30px; }
+.note textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+.note textarea:focus { outline: none; }
+.note-adds { display: flex; flex-wrap: wrap; gap: 4px; margin-left: -8px; }
+.note-adds button { gap: 4px; font-size: 13px; }
+.note-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.sheet-notes { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.sheet-notes > .btn-ghost { align-self: flex-start; margin-left: -8px; }
+
+/* A word with a note on it: a small accent dot over its corner, where it does
+   not move the chord row or the word. */
+.word.has-note { position: relative; }
+.word.has-note::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: 0.2em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+/* The reading view: a word's note under its line, and the song's notes in a
+   panel at the top of the words. */
+.lyric-noted { display: flex; flex-direction: column; gap: 2px; }
+.line-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, var(--color-accent) 60%, transparent);
+  color: color-mix(in srgb, var(--color-text) 72%, transparent);
+}
+.line-note { margin: 0; font-style: italic; }
+.line-note.note-strum, .line-note.note-picking { font-style: normal; }
+
+.fs-notes {
+  margin: 0 0 18px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+.fs-notes summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.fs-notes summary em { font-style: normal; color: var(--color-accent); margin-left: 4px; }
+.fs-note { margin-top: 8px; }
+.fs-note > span {
+  display: block;
+  font-size: 11.5px;
+  color: var(--color-accent);
+}
+.fs-note p { margin: 2px 0 0; line-height: 1.45; white-space: pre-wrap; }

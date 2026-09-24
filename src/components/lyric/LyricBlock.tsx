@@ -1,4 +1,4 @@
-import type { Placements, Word } from '../../types/song';
+import type { Placements, SongNote, Word } from '../../types/song';
 import { firstLinesWithContent, groupByLine, lineCount } from '../../lib/lyric';
 import ChordedLine, { type LyricSizes } from './ChordedLine';
 
@@ -20,6 +20,9 @@ interface Props {
   maxLines?: number;
   onWordClick?: (wordId: string) => void;
   selectedWordId?: string | null;
+  /** See ChordedLine: notes on words, marked, and printed under their line if `notesInline`. */
+  notes?: Map<string, SongNote[]>;
+  notesInline?: boolean;
 }
 
 /** Every line of the lyric, with blank lines kept as the gaps they are. */
@@ -32,6 +35,8 @@ export default function LyricBlock({
   maxLines,
   onWordClick,
   selectedWordId,
+  notes,
+  notesInline,
 }: Props) {
   const lines = groupByLine(words, lineCount(lyric));
   const shown = maxLines === undefined ? lines : firstLinesWithContent(lines, maxLines);
@@ -51,6 +56,8 @@ export default function LyricBlock({
             sizes={sizes}
             onWordClick={onWordClick}
             selectedWordId={selectedWordId}
+            notes={notes}
+            notesInline={notesInline}
           />
         ),
       )}

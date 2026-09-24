@@ -55,13 +55,17 @@ service cloud.firestore {
         && s.chords is list && s.chords.size() <= 100
         && s.lyric is string && s.lyric.size() <= 20000
         && s.words is list && s.words.size() <= 5000
-        && s.placements is map && s.placements.size() <= 5000;
+        && s.placements is map && s.placements.size() <= 5000
+        // How to play it (SongNote in src/types/song.ts), absent when there
+        // are none. The 100 is MAX_NOTES in src/lib/notes.ts; a note's own
+        // length is the app's to keep, since rules cannot look inside a list.
+        && (!('notes' in s) || (s.notes is list && s.notes.size() <= 100));
     }
 
     function validSong(s, songId) {
       return s.keys().hasOnly(['id', 'title', 'artist', 'key', 'feel', 'capo', 'chords', 'lyric',
-                               'words', 'placements', 'shared', 'copiedFrom', 'createdAt',
-                               'updatedAt'])
+                               'words', 'placements', 'notes', 'shared', 'copiedFrom',
+                               'createdAt', 'updatedAt'])
         && s.id == songId
         && validMusic(s)
         && (!('shared' in s) || s.shared is map)
@@ -188,7 +192,7 @@ service cloud.firestore {
           && d.version is int
           && d.song is map
           && d.song.keys().hasOnly(['title', 'artist', 'key', 'feel', 'capo', 'chords', 'lyric',
-                                    'words', 'placements'])
+                                    'words', 'placements', 'notes'])
           && validMusic(d.song)
           && d.publishedAt is number && d.updatedAt is number;
       }

@@ -1,6 +1,7 @@
 import type { CopiedFrom, Song } from '../types/song';
 import type { SharePayload, SharedCard, SharedSong } from '../types/sharedSong';
 import { parseSong } from './storage';
+import { MAX_NOTES, MAX_NOTE_CHARS } from './notes';
 
 /**
  * Sharing, the part with no server in it: what travels, what a recipient's copy
@@ -31,7 +32,7 @@ export const MAX_CHORDS = 100;
 
 /** Why the account would refuse this song, in words for the player; null if it would not. */
 export function tooBigToSave(
-  song: Pick<Song, 'title' | 'artist' | 'lyric' | 'words' | 'chords'>,
+  song: Pick<Song, 'title' | 'artist' | 'lyric' | 'words' | 'chords' | 'notes'>,
 ): string | null {
   if (song.lyric.length > MAX_LYRIC_CHARS || song.words.length > MAX_WORDS) {
     return 'These words are too long to save to your account. Split the song in two.';
@@ -39,6 +40,9 @@ export function tooBigToSave(
   if (song.chords.length > MAX_CHORDS) return 'That is more chords than one song can hold.';
   if (song.title.length > MAX_TITLE_CHARS) return 'That title is too long to save.';
   if ((song.artist?.length ?? 0) > MAX_ARTIST_CHARS) return 'That artist name is too long to save.';
+  const notes = song.notes ?? [];
+  if (notes.length > MAX_NOTES) return 'That is more notes than one song can hold.';
+  if (notes.some((n) => n.text.length > MAX_NOTE_CHARS)) return 'One of the notes is too long to save.';
   return null;
 }
 
@@ -59,6 +63,8 @@ export function toSharePayload(song: Song): SharePayload {
     lyric: song.lyric,
     words: song.words,
     placements: song.placements,
+    // How to play it travels with it: that is most of what a bandmate needs.
+    ...(song.notes?.length ? { notes: song.notes } : {}),
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WORD_SIZES, a4SheetLayout, sheetLines } from '../exportPdf';
+import { WORD_SIZES, a4SheetLayout, sheetLines, sheetWideNotes } from '../exportPdf';
 import { tokenise } from '../lyric';
 import type { Placements } from '../../types/song';
 
@@ -17,7 +17,7 @@ describe('sheetLines', () => {
   it('keeps the blank line as a gap, not a row of words', () => {
     const { lines } = linesFor(LYRIC);
     expect(lines).toHaveLength(3);
-    expect(lines[1]).toEqual({ blank: true, words: [] });
+    expect(lines[1]).toEqual({ blank: true, words: [], notes: [] });
     expect(lines[0].words.map((w) => w.text)).toEqual([
       'the',
       'harbour',
@@ -73,5 +73,54 @@ describe('a4SheetLayout', () => {
   it('fits at least four chord diagrams across the reference row', () => {
     const { lines } = linesFor(LYRIC);
     expect(a4SheetLayout(lines).chordsAcross).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('notes on the printed sheet', () => {
+  const lyric = Array.from({ length: 30 }, (_, i) => `line number ${i} of the song`).join('\n');
+  const words = tokenise(lyric);
+
+  it('puts a word note under the line its word is on', () => {
+    const lines = sheetLines(lyric, words, {}, () => null, [
+      { id: 'n', kind: 'general', text: 'Quietly', wordId: words[7].id },
+    ]);
+    expect(lines[1].notes).toEqual([{ label: null, text: 'Quietly', mono: false }]);
+    expect(lines[0].notes).toEqual([]);
+  });
+
+  it('labels a pattern, and sets it in the fixed-width face', () => {
+    expect(
+      sheetWideNotes([
+        { id: 's', kind: 'strum', text: 'D DU UDU' },
+        { id: 'g', kind: 'general', text: 'Gently' },
+      ]),
+    ).toEqual([
+      { label: null, text: 'Gently', mono: false },
+      { label: 'Strumming', text: 'D DU UDU', mono: true },
+    ]);
+  });
+
+  /* The page is one page: notes take room, so the words step down to make it. */
+  it('counts the notes when choosing a size, and still fits the page', () => {
+    const bare = a4SheetLayout(sheetLines(lyric, words, {}, () => null));
+    const noted = a4SheetLayout(
+      sheetLines(
+        lyric,
+        words,
+        {},
+        () => null,
+        words.filter((_, i) => i % 36 === 0).map((w, i) => ({
+          id: `n${i}`,
+          kind: 'general' as const,
+          text: 'Let this one ring out over the bar before the change',
+          wordId: w.id,
+        })),
+      ),
+      0,
+      undefined,
+      sheetWideNotes([{ id: 's', kind: 'strum', text: 'D DU UDU\nD DU UDU' }]),
+    );
+    expect(noted.wordSize).toBeLessThan(bare.wordSize);
+    expect(noted.overflows).toBe(false);
   });
 });

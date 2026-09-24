@@ -5,6 +5,7 @@ import type { MyChord } from '../types/myChord';
 import { newId } from './id';
 import { clampRootFret } from './layout';
 import { parsePlaylist } from './playlists';
+import { parseNotes } from './notes';
 
 /**
  * The song store: many songs keyed by id, plus a pointer at the open one.
@@ -228,6 +229,7 @@ export function parseSong(x: unknown): Song | null {
   const now = Date.now();
   const shared = parseSharedRef(raw.shared);
   const copiedFrom = parseCopiedFrom(raw.copiedFrom);
+  const notes = parseNotes(raw.notes);
   return {
     id: raw.id,
     title: str(raw.title),
@@ -243,6 +245,8 @@ export function parseSong(x: unknown): Song | null {
     lyric: str(raw.lyric),
     words: Array.isArray(raw.words) ? raw.words.filter(isWord) : [],
     placements: parsePlacements(raw.placements),
+    // Absent when there are none: an empty list is never stored.
+    ...(notes.length ? { notes } : {}),
     // Left off entirely when absent, like `capo`: absent is the state.
     ...(shared ? { shared } : {}),
     ...(copiedFrom ? { copiedFrom } : {}),

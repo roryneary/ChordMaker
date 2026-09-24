@@ -36,7 +36,8 @@ export function isBlankSong(song: Song): boolean {
     !song.title.trim() &&
     !song.artist?.trim() &&
     !song.lyric.trim() &&
-    song.chords.length === 0
+    song.chords.length === 0 &&
+    !song.notes?.length
   );
 }
 

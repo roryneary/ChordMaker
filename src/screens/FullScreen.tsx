@@ -7,6 +7,7 @@ import LyricBlock from '../components/lyric/LyricBlock';
 import { useIsDesktop } from '../components/shell/useBreakpoint';
 import { usePrefs } from '../hooks/usePrefs';
 import { groupByLine, lineCount } from '../lib/lyric';
+import { NOTE_KIND_LABEL, notesByWord, songWideNotes } from '../lib/notes';
 import type { Song } from '../types/song';
 
 interface Props {
@@ -47,6 +48,28 @@ function useFillScreen(): { can: boolean; on: boolean; toggle: () => void } {
   }, []);
 
   return { can, on, toggle };
+}
+
+const NOTES_OPEN_KEY = 'chord-builder:fs-notes-open:v1';
+
+/** Whether the notes panel is open: this device's habit, not the song's. Open until closed. */
+function useNotesOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem(NOTES_OPEN_KEY) !== 'no';
+    } catch {
+      return true;
+    }
+  });
+  const remember = useCallback((next: boolean) => {
+    setOpen(next);
+    try {
+      window.localStorage.setItem(NOTES_OPEN_KEY, next ? 'yes' : 'no');
+    } catch {
+      // Private mode: it is open again next time.
+    }
+  }, []);
+  return [open, remember];
 }
 
 /**
@@ -108,6 +131,9 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
   const awake = useWakeLock(true);
   const fill = useFillScreen();
   const hasWords = song.words.length > 0;
+  const [notesOpen, setNotesOpen] = useNotesOpen();
+  const byWord = notesByWord(song.notes);
+  const wide = songWideNotes(song.notes);
 
   const base = isDesktop ? { word: 27, chord: 15 } : { word: 23, chord: 14 };
   // The chord scales with the words, holding the ~0.55 ratio.
@@ -131,6 +157,8 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
             placements={song.placements}
             nameOf={nameOf}
             sizes={sizes}
+            notes={byWord}
+            notesInline
           />
         ),
       )}
@@ -184,6 +212,25 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
       )}
 
       <div className={`fs-words${isDesktop ? ' fs-wide' : ''}`}>
+        {/* At the top of the scroller rather than pinned: read before playing,
+            then scrolled past. Closed, it is one line; that is remembered. */}
+        {wide.length > 0 && (
+          <details
+            className="fs-notes"
+            open={notesOpen}
+            onToggle={(e) => setNotesOpen(e.currentTarget.open)}
+          >
+            <summary>
+              Notes <em>{wide.length}</em>
+            </summary>
+            {wide.map((note) => (
+              <div key={note.id} className={`fs-note note-${note.kind}`}>
+                {note.kind !== 'general' && <span>{NOTE_KIND_LABEL[note.kind]}</span>}
+                <p style={{ fontSize: Math.max(12, sizes.word * 0.7) }}>{note.text}</p>
+              </div>
+            ))}
+          </details>
+        )}
         {hasWords ? (
           block
         ) : (

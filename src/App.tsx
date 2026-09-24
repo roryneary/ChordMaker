@@ -627,6 +627,12 @@ function Router() {
               dispatch({ type: 'REORDER_CHORD', id: song.id, chordId, to })
             }
             onOrderAsPlayed={() => dispatch({ type: 'ORDER_CHORDS_AS_PLAYED', id: song.id })}
+            notesOn={{
+              onAdd: (note) => dispatch({ type: 'ADD_NOTE', id: song.id, note }),
+              onUpdate: (noteId, text, kind) =>
+                dispatch({ type: 'UPDATE_NOTE', id: song.id, noteId, text, kind }),
+              onRemove: (noteId) => dispatch({ type: 'REMOVE_NOTE', id: song.id, noteId }),
+            }}
             update={updateFor(song)}
             onReplaceMine={(shared) =>
               dispatch({ type: 'REPLACE_FROM_SHARE', id: song.id, shared })

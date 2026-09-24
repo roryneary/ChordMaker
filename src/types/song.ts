@@ -17,6 +17,30 @@ export interface Word {
 export type Placements = Record<string, string>;
 
 /**
+ * What a note is about. `general` is how to play the song — "palm mute the
+ * verses", "let the last chord ring". Strumming and picking patterns are kept
+ * apart because they are read differently: set in a fixed-width face, where
+ * "D DU UDU" and a line of tab keep their columns.
+ */
+export type NoteKind = 'general' | 'strum' | 'picking';
+
+/**
+ * A note on a song: how to play it, or how to play one part of it. Free text.
+ *
+ * `wordId` ties it to a word, the way a chord placement is — so it survives
+ * edits to the lyric (`retokenise` keeps the ids) and shows where that word is.
+ * A note for "the chorus" is a note on the chorus's first word. Absent means it
+ * is about the whole song. If its word is edited out of the lyric the note is
+ * not lost: it loses its word and becomes one about the whole song.
+ */
+export interface SongNote {
+  id: string;
+  kind: NoteKind;
+  text: string;
+  wordId?: string;
+}
+
+/**
  * On the owner's song: it has been shared, and this is where. The shared copy
  * is a separate document (`shared/{shareId}`, see types/sharedSong.ts) — nobody
  * is ever let into the owner's own songs, so sharing copies out instead.
@@ -99,6 +123,12 @@ export interface Song {
   /** Derived from `lyric`, but ids are stable across edits — see lib/lyric.ts. */
   words: Word[];
   placements: Placements;
+  /**
+   * How to play it. Optional, the `artist` precedent: absent when there are
+   * none, so every song saved before notes existed reads correctly without
+   * them, and an empty list is never stored.
+   */
+  notes?: SongNote[];
   /** Both optional, the `capo` precedent: absent is a meaningful state — never
       shared, made here — and every song already saved reads correctly without them. */
   shared?: SharedRef;

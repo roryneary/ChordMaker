@@ -18,10 +18,13 @@ import CapoChip, { CAPO_FRETS, capoChosen, capoLabel } from '../components/CapoC
 import ChordDiagram from '../components/ChordDiagram';
 import DeleteSongSheet from '../components/DeleteSongSheet';
 import SavedLine from '../components/SavedLine';
+import SongNotes, { NoteDraft, NoteField, type NoteHandlers } from '../components/SongNotes';
 import LyricBlock from '../components/lyric/LyricBlock';
 import { useIsDesktop } from '../components/shell/useBreakpoint';
 import { ordinal } from '../lib/numerals';
 import { lineCount, unchordedLineCount } from '../lib/lyric';
+import { newId } from '../lib/id';
+import { notesByWord } from '../lib/notes';
 import type { Membership } from '../lib/playlists';
 import {
   MAX_ARTIST_CHARS,
@@ -48,6 +51,8 @@ interface Props {
   onMoveChord: (chordId: string, to: number) => void;
   /** "Order as played": by the first word each chord is dropped on. */
   onOrderAsPlayed: () => void;
+  /** How to play it: song-wide notes, patterns, and notes on words. */
+  notesOn: NoteHandlers;
   onTitle: (title: string) => void;
   /** Who plays it. Blank clears it — see the reducer's SET_ARTIST. */
   onArtist: (artist: string) => void;
@@ -87,6 +92,7 @@ export default function SongScreen({
   onPlace,
   onMoveChord,
   onOrderAsPlayed,
+  notesOn,
   onTitle,
   onArtist,
   update,
@@ -99,6 +105,13 @@ export default function SongScreen({
 }: Props) {
   const isDesktop = useIsDesktop();
   const [picking, setPicking] = useState<string | null>(null);
+  /* Writing a note on the word being picked: opened from the word's sheet. */
+  const [noting, setNoting] = useState(false);
+  const byWord = notesByWord(song.notes);
+  const pick = (wordId: string | null) => {
+    setPicking(wordId);
+    setNoting(false);
+  };
   const [deleting, setDeleting] = useState(false);
   const [deciding, setDeciding] = useState(false);
   /* Arranging: the tiles become ← / → instead of opening the editor. The one
@@ -141,7 +154,7 @@ export default function SongScreen({
   const place = useCallback(
     (chordId: string | null) => {
       if (picking) onPlace(picking, chordId);
-      setPicking(null);
+      pick(null);
     },
     [picking, onPlace],
   );
@@ -259,6 +272,14 @@ export default function SongScreen({
     </li>
   );
 
+  const notesHead = (
+    <div className="label-row">
+      <h2>Notes</h2>
+      <span>how to play it — strumming, picking, anything</span>
+    </div>
+  );
+  const notesBlock = <SongNotes notes={song.notes} words={song.words} on={notesOn} newId={newId} />;
+
   const footText = () =>
     toChord > 0
       ? `${Spell(toChord)} line${toChord === 1 ? '' : 's'} with no chords yet`
@@ -279,8 +300,10 @@ export default function SongScreen({
             placements={song.placements}
             nameOf={nameOf}
             sizes={isDesktop ? { word: 17, chord: 12.5 } : { word: 16, chord: 11.5 }}
-            onWordClick={song.chords.length ? setPicking : undefined}
+            /* Always tappable: a word takes a note even before there are chords. */
+            onWordClick={pick}
             selectedWordId={picking}
+            notes={byWord}
           />
           <p className="words-block-foot">
             <span>{footText()}</span>
@@ -299,17 +322,19 @@ export default function SongScreen({
     </div>
   );
 
+  const pickedWord = picking ? song.words.find((w) => w.id === picking) : undefined;
+  const wordNotes = picking ? (byWord.get(picking) ?? []) : [];
   const picker = picking && (
     <>
-      <button
-        type="button"
-        className="scrim"
-        aria-label="Close"
-        onClick={() => setPicking(null)}
-      />
-      <div className="sheet" role="dialog" aria-label="Choose a chord">
+      <button type="button" className="scrim" aria-label="Close" onClick={() => pick(null)} />
+      <div className="sheet" role="dialog" aria-label={`“${pickedWord?.text ?? ''}”`}>
         <i className="grab" />
-        <h2>Which chord lands here?</h2>
+        <h2>
+          {song.chords.length ? 'Which chord lands here?' : `“${pickedWord?.text ?? ''}”`}
+        </h2>
+        {song.chords.length === 0 && (
+          <p className="note-hint">Add a chord to the song to drop one here. A note can go on it now.</p>
+        )}
         <div className="chips">
           {song.chords.map((c) => (
             <button
@@ -327,8 +352,27 @@ export default function SongScreen({
             Take the chord off this word
           </button>
         )}
-        <button type="button" className="btn-secondary btn-block" onClick={() => setPicking(null)}>
-          Not yet
+        {/* Notes on this word: the way to say how one part of the song goes. */}
+        <div className="sheet-notes">
+          {wordNotes.map((note) => (
+            <NoteField key={`${note.id}:${note.text}`} note={note} on={notesOn} />
+          ))}
+          {noting ? (
+            <NoteDraft
+              kind="general"
+              wordId={picking}
+              onAdd={notesOn.onAdd}
+              onDone={() => setNoting(false)}
+              newId={newId}
+            />
+          ) : (
+            <button type="button" className="btn-ghost" onClick={() => setNoting(true)}>
+              {wordNotes.length ? 'Add another note here' : 'Add a note here'}
+            </button>
+          )}
+        </div>
+        <button type="button" className="btn-secondary btn-block" onClick={() => pick(null)}>
+          {song.chords.length && !noting ? 'Not yet' : 'Done'}
         </button>
       </div>
     </>
@@ -595,9 +639,14 @@ export default function SongScreen({
             {!arranging && addCell('Next chord', true)}
           </ul>
 
+          {notesHead}
+          {notesBlock}
+
           <div className="label-row label-row-words">
             <h2>The words</h2>
-            <span>{hasLyric ? 'drop a chord on the word it lands on' : 'not pasted yet'}</span>
+            <span>
+              {hasLyric ? 'drop a chord, or a note, on the word it lands on' : 'not pasted yet'}
+            </span>
             <span className="spacer" />
             <button type="button" className="btn-ghost" onClick={onEditWords}>
               <PencilSimple size={15} />
@@ -666,9 +715,12 @@ export default function SongScreen({
           {!arranging && addCell('Add', false)}
         </ul>
 
+        {notesHead}
+        {notesBlock}
+
         <div className="label-row">
           <h2>The words</h2>
-          <span>{hasLyric ? 'tap a word to drop a chord' : 'not pasted yet'}</span>
+          <span>{hasLyric ? 'tap a word for a chord or a note' : 'not pasted yet'}</span>
         </div>
         {wordsBlock}
         {deleteRow}

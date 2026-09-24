@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ChordSpec } from '../types/chord';
-import type { SavedChord, Song } from '../types/song';
+import type { NoteKind, SavedChord, Song, SongNote } from '../types/song';
 import type { Playlist } from '../types/playlist';
 import type { MyChord } from '../types/myChord';
 import type { SharedSong } from '../types/sharedSong';
@@ -8,6 +8,7 @@ import { lineageOf } from '../lib/sharedSong';
 import { isBlankSong } from '../lib/songSummary';
 import { chordChanged } from '../lib/chordEdits';
 import { orderByFirstUse } from '../lib/chordOrder';
+import { pruneNoteWords } from '../lib/notes';
 import { cleanChordName, collapseByShape, keepOffer, newMyChord } from '../lib/myChords';
 import { newId } from '../lib/id';
 import { prunePlacements, pruneToChords, retokenise } from '../lib/lyric';
@@ -93,6 +94,10 @@ export type SongsAction =
   | { type: 'UPDATE_CHORD'; id: string; chordId: string; spec: ChordSpec }
   | { type: 'REMOVE_CHORD'; id: string; chordId: string }
   | { type: 'REORDER_CHORD'; id: string; chordId: string; to: number }
+  /** Notes: how to play it, or one part of it. Ids minted by the caller, like a song's. */
+  | { type: 'ADD_NOTE'; id: string; note: SongNote }
+  | { type: 'UPDATE_NOTE'; id: string; noteId: string; text: string; kind?: NoteKind }
+  | { type: 'REMOVE_NOTE'; id: string; noteId: string }
   /** "Order as played": by the first word each chord is dropped on. See lib/chordOrder.ts. */
   | { type: 'ORDER_CHORDS_AS_PLAYED'; id: string }
   | { type: 'PLACE_CHORD'; id: string; wordId: string; chordId: string | null }
@@ -141,6 +146,13 @@ const mark = (unsynced: string[], id: string): string[] =>
 function unshared(song: Song): Song {
   const next = { ...song };
   delete next.shared;
+  return next;
+}
+
+/** The song with these notes, and no `notes` key at all when there are none. */
+function songWithNotes(song: Song, notes: SongNote[]): Song {
+  const next = { ...song, notes };
+  if (!notes.length) delete (next as Partial<Song>).notes;
   return next;
 }
 
@@ -438,12 +450,44 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
         // Ids carry across the edit wherever the text still lines up, which is
         // what keeps already-placed chords attached to their words.
         const words = retokenise(s.words, action.lyric);
-        return {
+        const next = {
           ...s,
           lyric: action.lyric,
           words,
           placements: prunePlacements(s.placements, words),
         };
+        // A note on a word that is gone is kept, about the whole song instead.
+        if (s.notes) next.notes = pruneNoteWords(s.notes, words);
+        return next;
+      });
+
+    case 'ADD_NOTE':
+      return editSong(store, action.id, (s) => {
+        const text = action.note.text.trim();
+        if (!text) return s;
+        return { ...s, notes: [...(s.notes ?? []), { ...action.note, text }] };
+      });
+
+    case 'UPDATE_NOTE':
+      return editSong(store, action.id, (s) => {
+        const held = s.notes?.find((n) => n.id === action.noteId);
+        if (!held || !s.notes) return s;
+        const text = action.text.trim();
+        // Rubbed out is removed: an empty note is nothing anyone wrote.
+        if (!text) return songWithNotes(s, s.notes.filter((n) => n.id !== action.noteId));
+        const kind = action.kind ?? held.kind;
+        // Unchanged is no edit: nobody holding a copy is told it changed.
+        if (text === held.text && kind === held.kind) return s;
+        return {
+          ...s,
+          notes: s.notes.map((n) => (n.id === action.noteId ? { ...n, text, kind } : n)),
+        };
+      });
+
+    case 'REMOVE_NOTE':
+      return editSong(store, action.id, (s) => {
+        if (!s.notes?.some((n) => n.id === action.noteId)) return s;
+        return songWithNotes(s, s.notes.filter((n) => n.id !== action.noteId));
       });
 
     case 'ADD_CHORD': {
