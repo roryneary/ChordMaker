@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import {
+  ArrowLeft,
   ArrowRight,
   ArrowsClockwise,
   ArrowsOutSimple,
@@ -43,6 +44,10 @@ interface Props {
   onReady: () => void;
   onCapo: (capo: number | null) => void;
   onPlace: (wordId: string, chordId: string | null) => void;
+  /** Moves a chord along the row: the order the reading view pins them in. */
+  onMoveChord: (chordId: string, to: number) => void;
+  /** "Order as played": by the first word each chord is dropped on. */
+  onOrderAsPlayed: () => void;
   onTitle: (title: string) => void;
   /** Who plays it. Blank clears it — see the reducer's SET_ARTIST. */
   onArtist: (artist: string) => void;
@@ -80,6 +85,8 @@ export default function SongScreen({
   onReady,
   onCapo,
   onPlace,
+  onMoveChord,
+  onOrderAsPlayed,
   onTitle,
   onArtist,
   update,
@@ -94,6 +101,11 @@ export default function SongScreen({
   const [picking, setPicking] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deciding, setDeciding] = useState(false);
+  /* Arranging: the tiles become ← / → instead of opening the editor. The one
+     just moved is picked out, as a moved playlist row is, so a run of taps
+     never loses track of which chord is travelling. */
+  const [arranging, setArranging] = useState(false);
+  const [movedId, setMovedId] = useState<string | null>(null);
   /**
    * Latched at the moment the check opens, not read live: choosing the capo
    * inside the sheet would otherwise pull the question out from under the
@@ -154,13 +166,83 @@ export default function SongScreen({
     />
   );
 
-  const chordCell = (chord: SavedChord, big: boolean) => (
-    <li key={chord.id}>
-      <button type="button" className="card chord-tile" onClick={() => onEditChord(chord.id)}>
-        <strong style={{ fontSize: big ? 22 : 18 }}>{chord.spec.name.trim() || '—'}</strong>
-        <ChordDiagram spec={chord.spec} />
+  const move = (chordId: string, to: number) => {
+    setMovedId(chordId);
+    onMoveChord(chordId, to);
+  };
+
+  const chordCell = (chord: SavedChord, big: boolean, i: number) => {
+    const name = chord.spec.name.trim() || '—';
+    if (!arranging) {
+      return (
+        <li key={chord.id}>
+          <button type="button" className="card chord-tile" onClick={() => onEditChord(chord.id)}>
+            <strong style={{ fontSize: big ? 22 : 18 }}>{name}</strong>
+            <ChordDiagram spec={chord.spec} />
+          </button>
+        </li>
+      );
+    }
+    const last = song.chords.length - 1;
+    return (
+      <li key={chord.id}>
+        <div className={`card chord-tile is-arranging${movedId === chord.id ? ' is-moved' : ''}`}>
+          <strong style={{ fontSize: big ? 22 : 18 }}>{name}</strong>
+          <ChordDiagram spec={chord.spec} />
+          <span className="chord-move">
+            <button
+              type="button"
+              className="icon-btn"
+              disabled={i === 0}
+              onClick={() => move(chord.id, i - 1)}
+              aria-label={`Move ${name} earlier`}
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              disabled={i === last}
+              onClick={() => move(chord.id, i + 1)}
+              aria-label={`Move ${name} later`}
+            >
+              <ArrowRight size={16} />
+            </button>
+          </span>
+        </div>
+      </li>
+    );
+  };
+
+  /* Only worth offering when there is an order to arrange. "As played" only
+     when there are chords on the words to read the order from. */
+  const placedAny = Object.keys(song.placements).length > 0;
+  const arrangeTools = song.chords.length > 1 && (
+    <span className="arrange-tools">
+      {arranging && placedAny && (
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={() => {
+            setMovedId(null);
+            onOrderAsPlayed();
+          }}
+        >
+          Order as played
+        </button>
+      )}
+      <button
+        type="button"
+        className={arranging ? 'btn-secondary' : 'btn-ghost'}
+        aria-pressed={arranging}
+        onClick={() => {
+          setArranging((on) => !on);
+          setMovedId(null);
+        }}
+      >
+        {arranging ? 'Done' : 'Arrange'}
       </button>
-    </li>
+    </span>
   );
 
   const addCell = (label: string, big: boolean) => (
@@ -505,10 +587,12 @@ export default function SongScreen({
           <div className="label-row">
             <h2>The chords</h2>
             <span>{spell(song.chords.length)}, in the order you play them</span>
+            <span className="spacer" />
+            {arrangeTools}
           </div>
           <ul className="chord-tiles chord-tiles-d">
-            {song.chords.map((c) => chordCell(c, true))}
-            {addCell('Next chord', true)}
+            {song.chords.map((c, i) => chordCell(c, true, i))}
+            {!arranging && addCell('Next chord', true)}
           </ul>
 
           <div className="label-row label-row-words">
@@ -574,10 +658,12 @@ export default function SongScreen({
         <div className="label-row">
           <h2>The chords</h2>
           <span>in the order you play them</span>
+          <span className="spacer" />
+          {arrangeTools}
         </div>
         <ul className="chord-tiles">
-          {song.chords.map((c) => chordCell(c, false))}
-          {addCell('Add', false)}
+          {song.chords.map((c, i) => chordCell(c, false, i))}
+          {!arranging && addCell('Add', false)}
         </ul>
 
         <div className="label-row">

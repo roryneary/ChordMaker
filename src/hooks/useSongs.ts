@@ -7,6 +7,7 @@ import type { SharedSong } from '../types/sharedSong';
 import { lineageOf } from '../lib/sharedSong';
 import { isBlankSong } from '../lib/songSummary';
 import { chordChanged } from '../lib/chordEdits';
+import { orderByFirstUse } from '../lib/chordOrder';
 import { cleanChordName, collapseByShape, keepOffer, newMyChord } from '../lib/myChords';
 import { newId } from '../lib/id';
 import { prunePlacements, pruneToChords, retokenise } from '../lib/lyric';
@@ -92,6 +93,8 @@ export type SongsAction =
   | { type: 'UPDATE_CHORD'; id: string; chordId: string; spec: ChordSpec }
   | { type: 'REMOVE_CHORD'; id: string; chordId: string }
   | { type: 'REORDER_CHORD'; id: string; chordId: string; to: number }
+  /** "Order as played": by the first word each chord is dropped on. See lib/chordOrder.ts. */
+  | { type: 'ORDER_CHORDS_AS_PLAYED'; id: string }
   | { type: 'PLACE_CHORD'; id: string; wordId: string; chordId: string | null }
   /** Keeps a shared song: `song` is the recipient's own copy, id already minted
       (`songFromShare`), so the caller can go straight to it. */
@@ -488,10 +491,20 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
       return editSong(store, action.id, (s) => {
         const from = s.chords.findIndex((c) => c.id === action.chordId);
         if (from === -1) return s;
+        const to = Math.max(0, Math.min(action.to, s.chords.length - 1));
+        // Nowhere to go (already first, already last): not an edit, so no
+        // stamp, no sync, and nobody holding a copy is told it changed.
+        if (to === from) return s;
         const chords = s.chords.slice();
         const [moved] = chords.splice(from, 1);
-        chords.splice(Math.max(0, Math.min(action.to, chords.length)), 0, moved);
+        chords.splice(to, 0, moved);
         return { ...s, chords };
+      });
+
+    case 'ORDER_CHORDS_AS_PLAYED':
+      return editSong(store, action.id, (s) => {
+        const chords = orderByFirstUse(s);
+        return chords === s.chords ? s : { ...s, chords };
       });
 
     case 'PLACE_CHORD':

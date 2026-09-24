@@ -617,6 +617,10 @@ function Router() {
             onPlace={(wordId, chordId) =>
               dispatch({ type: 'PLACE_CHORD', id: song.id, wordId, chordId })
             }
+            onMoveChord={(chordId, to) =>
+              dispatch({ type: 'REORDER_CHORD', id: song.id, chordId, to })
+            }
+            onOrderAsPlayed={() => dispatch({ type: 'ORDER_CHORDS_AS_PLAYED', id: song.id })}
             update={updateFor(song)}
             onReplaceMine={(shared) =>
               dispatch({ type: 'REPLACE_FROM_SHARE', id: song.id, shared })
