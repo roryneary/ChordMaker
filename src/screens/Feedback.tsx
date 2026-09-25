@@ -122,7 +122,8 @@ export default function Feedback({ author, mentions, onOpen, onSignIn }: Props) 
     <>
       <h1 className="display-sm">Feedback</h1>
       <p className="library-sub">
-        App ideas, problems… Everyone signed in can read them and reply.
+        Something you would change, something that went wrong, an idea. Everyone signed in can
+        read it and reply.
       </p>
     </>
   );
