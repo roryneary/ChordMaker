@@ -125,10 +125,13 @@ export default function Songs({
           : `${n} song${n === 1 ? '' : 's'}, on this device. No signal needed.`}
       </p>
       <div className="songs-tools">
-        <button type="button" className="btn-ghost songs-find-shared" onClick={onFindShared}>
-          <UsersThree size={15} />
-          Find songs other people have shared
-        </button>
+        {/* Empty, the list's own "Find a shared song" says it louder. */}
+        {n > 0 && (
+          <button type="button" className="btn-ghost songs-find-shared" onClick={onFindShared}>
+            <UsersThree size={15} />
+            Find songs other people have shared
+          </button>
+        )}
         {/* The one pref worth a switch where the chords are: it changes every
             diagram on the page at once, so you see what it does. The rest are
             one tap further, under "How you play". */}
@@ -154,9 +157,15 @@ export default function Songs({
       </div>
 
       {n === 0 ? (
+        // Shared first: a finished song to play is a better first minute than
+        // a blank one to fill, and you can make it your own from there.
         <div className="songs-empty">
-          <p>No songs yet.</p>
-          <button type="button" className="btn-primary btn-block" onClick={onStart}>
+          <p>No songs yet. Start with one someone has already shared.</p>
+          <button type="button" className="btn-primary btn-block" onClick={onFindShared}>
+            <UsersThree size={16} />
+            Find a shared song
+          </button>
+          <button type="button" className="btn-secondary btn-block" onClick={onStart}>
             New song
           </button>
         </div>

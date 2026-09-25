@@ -4,7 +4,6 @@ import {
   MusicNotes,
   PencilSimple,
   Playlist,
-  PlusCircle,
   SlidersHorizontal,
   UserCircle,
   UsersThree,
@@ -36,7 +35,6 @@ interface Props {
   currentId: string | null;
   onGo: (route: Route) => void;
   onOpenSong: (songId: string) => void;
-  onStart: () => void;
 }
 
 /**
@@ -84,7 +82,6 @@ export default function Sidebar({
   currentId,
   onGo,
   onOpenSong,
-  onStart,
 }: Props) {
   const inPlaylists =
     route.name === 'playlists' || route.name === 'playlist' || route.name === 'playlistAdd';
@@ -99,10 +96,9 @@ export default function Sidebar({
         <ChordCreatorLockup size={28} />
       </div>
 
-      <button type="button" className="nav-item" onClick={onStart}>
-        <PlusCircle size={18} />
-        <span>New song</span>
-      </button>
+      {/* No "New song" here. A new player does better finding a song someone
+          has already made than facing a blank one, so the way in is Songs and
+          Shared songs; Songs carries "New song" for when you want to make one. */}
       <button
         type="button"
         className={`nav-item${route.name === 'songs' ? ' is-active' : ''}`}

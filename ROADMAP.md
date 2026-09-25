@@ -132,8 +132,8 @@ someone with no songs and the recently opened songs for everyone else. What was 
 - ~~**On a phone, Home is the only door to a new song once you have one.**~~ Songs has a permanent
   "New song" now.
 - ~~**The same choice is worded two ways**~~ — there is one way to start, worded one way.
-- ~~The sidebar's "Start something" only ever starts with the words.~~ It is "New song" and
-  does what Home's card does.
+- ~~The sidebar's "Start something" only ever starts with the words.~~ It became "New song", and
+  has since left the sidebar altogether (see "Home welcomes a new player", 2026-09-25).
 - ~~One chord to send to someone still has to be a song.~~ It is made in the Chords tab now (§0a).
 - **Tapping a start card to see what it does leaves an empty "Untitled" behind**, which Home then
   offers under "Pick up where you left off". **Fixed 2026-09-20:** walking out of a song with no
@@ -621,13 +621,17 @@ refused.
   **"A song to play" and "Just the chords" are one "New song"**, landing on the song screen:
   both made the same song and differed only in which screen came next, so a new player was asked
   to choose a workflow before seeing either — and the song screen already focuses a fresh song's
-  title and offers both the add-chord tile and "Paste the words in". Songs' empty state and the
-  sidebar say the same thing — "New song" everywhere, since "Start a song" read like starting to
-  play one (changed 2026-09-25) — and **Songs has a permanent "New song"**, without which a phone
-  with one song could only start a second from Home.
-  **The sidebar reads New song, Songs, Playlists, Shared songs, Chord library** (2026-09-25):
-  the music first, the chords after it. "How you play" and Feedback moved down beside the
-  account chip, because they are about the player and the app, not the songs.
+  title and offers both the add-chord tile and "Paste the words in". It is "New song" everywhere,
+  since "Start a song" read like starting to play one (changed 2026-09-25), and **Songs has a
+  permanent "New song"**, without which a phone with one song could only start a second from Home.
+  **The sidebar has no "New song"; it reads Songs, Playlists, Shared songs, Chord library**
+  (2026-09-25). A new player does better with a song someone has already made than with a blank
+  one, so the ways in are Songs and Shared songs, and making one is a button on Songs. **Songs'
+  empty state leads with "Find a shared song"**, with "New song" under it, and drops its "Find songs
+  other people have shared" link while empty so it doesn't say the same thing twice. "How you play"
+  and Feedback moved down beside the account chip, because they are about the player and the app,
+  not the songs. *Home's first-visit card still leads with "New song"* and offers the shared songs
+  as the smaller link. That is the next thing to turn round if shared-first is the rule.
   **"Recent" is new, and is not `updatedAt`.** The app had no record of what was opened: the
   list was in creation order, re-sorted by last edit only at sign-in, so "pick up where you left
   off" was really "the last song you made". Opening a song to play it is not an edit — stamping

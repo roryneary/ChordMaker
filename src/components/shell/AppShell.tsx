@@ -28,7 +28,6 @@ interface Props {
   onGo: (route: Route) => void;
   /** Opening a song, which plays it — see `openSong` in App.tsx. */
   onOpenSong: (songId: string) => void;
-  onStart: () => void;
   children: ReactNode;
 }
 
@@ -102,7 +101,6 @@ export default function AppShell({
   currentId,
   onGo,
   onOpenSong,
-  onStart,
   children,
 }: Props) {
   const isDesktop = useIsDesktop();
@@ -125,7 +123,6 @@ export default function AppShell({
           currentId={currentId}
           onGo={onGo}
           onOpenSong={onOpenSong}
-          onStart={onStart}
         />
       )}
       <main className="shell-main">{children}</main>

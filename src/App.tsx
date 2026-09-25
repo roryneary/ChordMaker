@@ -728,7 +728,6 @@ function Router() {
       currentId={store.currentId}
       onGo={onGo}
       onOpenSong={openSong}
-      onStart={startSong}
     >
       {screen()}
     </AppShell>
