@@ -191,7 +191,7 @@ export default function SignIn({
             <em>
               {mentionCount > 0
                 ? `${mentionCount} waiting for you`
-                : 'App ideas, problems, and the conversation about them'}
+                : 'App ideas, problems and conversation about them'}
             </em>
           </span>
           {mentionCount > 0 && <span className="tag tag-alert">{mentionCount}</span>}
