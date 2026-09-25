@@ -237,6 +237,11 @@ h1, h2, h3, h4 {
   box-shadow: var(--shadow-sm);
 }
 
+/* Settings and feedback, sat on the account chip. The foot takes the auto
+   margin, so the chip must give its own up or the two would split the space. */
+.nav-foot { margin-top: auto; padding-top: 18px; margin-bottom: 8px; }
+.nav-foot + .user-chip { margin-top: 0; }
+
 .avatar {
   flex: none;
   width: 28px;

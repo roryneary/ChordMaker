@@ -625,6 +625,9 @@ refused.
   sidebar say the same thing — "New song" everywhere, since "Start a song" read like starting to
   play one (changed 2026-09-25) — and **Songs has a permanent "New song"**, without which a phone
   with one song could only start a second from Home.
+  **The sidebar reads New song, Songs, Playlists, Shared songs, Chord library** (2026-09-25):
+  the music first, the chords after it. "How you play" and Feedback moved down beside the
+  account chip, because they are about the player and the app, not the songs.
   **"Recent" is new, and is not `updatedAt`.** The app had no record of what was opened: the
   list was in creation order, re-sorted by last edit only at sign-in, so "pick up where you left
   off" was really "the last song you made". Opening a song to play it is not an edit — stamping

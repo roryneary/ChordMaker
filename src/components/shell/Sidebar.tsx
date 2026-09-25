@@ -105,15 +105,6 @@ export default function Sidebar({
       </button>
       <button
         type="button"
-        className={`nav-item${route.name === 'library' || route.name === 'myChord' ? ' is-active' : ''}`}
-        onClick={() => onGo({ name: 'library' })}
-      >
-        <GridFour size={18} />
-        <span>Chord library</span>
-        <em className="nav-count">{LIBRARY.length + myChordCount}</em>
-      </button>
-      <button
-        type="button"
         className={`nav-item${route.name === 'songs' ? ' is-active' : ''}`}
         onClick={() => onGo({ name: 'songs' })}
       >
@@ -140,30 +131,14 @@ export default function Sidebar({
         <UsersThree size={18} />
         <span>Shared songs</span>
       </button>
-      {/* Here as well as on the phone's account screen: signed in, the desktop
-          never opens that screen, and these are the player's, not the account's. */}
       <button
         type="button"
-        className={`nav-item${route.name === 'settings' ? ' is-active' : ''}`}
-        onClick={() => onGo({ name: 'settings' })}
+        className={`nav-item${route.name === 'library' || route.name === 'myChord' ? ' is-active' : ''}`}
+        onClick={() => onGo({ name: 'library' })}
       >
-        <SlidersHorizontal size={18} />
-        <span>How you play</span>
-      </button>
-      {/* The count is only what is waiting for you, and only when there is
-          some: how many threads there are is nobody's business on every load. */}
-      <button
-        type="button"
-        className={`nav-item${inFeedback ? ' is-active' : ''}`}
-        onClick={() => onGo({ name: 'feedback' })}
-      >
-        <ChatCircleText size={18} />
-        <span>Feedback</span>
-        {mentionCount > 0 && (
-          <em className="nav-count is-alert" aria-label={`${mentionCount} waiting for you`}>
-            {mentionCount}
-          </em>
-        )}
+        <GridFour size={18} />
+        <span>Chord library</span>
+        <em className="nav-count">{LIBRARY.length + myChordCount}</em>
       </button>
 
       <hr className="nav-rule" />
@@ -213,6 +188,36 @@ export default function Sidebar({
         )}
         {songs.length === 0 && <li className="song-empty">Nothing yet.</li>}
       </ul>
+
+      {/* Down with the account, not up with the songs: these are about you and
+          the app, not about the music. */}
+      <div className="nav-foot">
+        {/* Here as well as on the phone's account screen: signed in, the desktop
+            never opens that screen, and these are the player's, not the account's. */}
+        <button
+          type="button"
+          className={`nav-item${route.name === 'settings' ? ' is-active' : ''}`}
+          onClick={() => onGo({ name: 'settings' })}
+        >
+          <SlidersHorizontal size={18} />
+          <span>How you play</span>
+        </button>
+        {/* The count is only what is waiting for you, and only when there is
+            some: how many threads there are is nobody's business on every load. */}
+        <button
+          type="button"
+          className={`nav-item${inFeedback ? ' is-active' : ''}`}
+          onClick={() => onGo({ name: 'feedback' })}
+        >
+          <ChatCircleText size={18} />
+          <span>Feedback</span>
+          {mentionCount > 0 && (
+            <em className="nav-count is-alert" aria-label={`${mentionCount} waiting for you`}>
+              {mentionCount}
+            </em>
+          )}
+        </button>
+      </div>
 
       {/* The handle, not the email: the sidebar is over someone's shoulder at
           a rehearsal as often as it is not. Signed out, the same slot is the
