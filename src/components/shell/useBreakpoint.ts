@@ -17,3 +17,23 @@ export function useIsDesktop(): boolean {
 
   return isDesktop;
 }
+
+/**
+ * Room for two pages of a song side by side: wide, and tall enough that each
+ * page holds a verse. A phone on its side is wide but not tall, and a split
+ * there is two slivers — so it keeps the one column.
+ */
+const WIDE_PAGES = '(min-width: 900px) and (min-height: 560px)';
+
+export function useTwoPagesFit(): boolean {
+  const [fits, setFits] = useState(() => window.matchMedia(WIDE_PAGES).matches);
+
+  useEffect(() => {
+    const mq = window.matchMedia(WIDE_PAGES);
+    const onChange = (e: MediaQueryListEvent) => setFits(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  return fits;
+}

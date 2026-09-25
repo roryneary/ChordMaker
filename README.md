@@ -172,6 +172,30 @@ sideways rather than wrapping, because every row it wrapped onto would come out 
 the diagrams are small (64 px, 88 px on desktop) on the grounds that mid-song you are checking
 a shape you already know. The PDF's chord reference row is the same idea on paper.
 
+**A tap on the words turns the page.** Scrolling takes a hand off the guitar for as long as it
+takes; a tap takes an instant. The top quarter of the words goes back, anywhere else goes on;
+a tap on a button, the notes or a text selection is not a turn. The decisions are pure
+functions in `lib/pages.ts`, tested; the screen only measures where each line is drawn
+(`readItems`) and hands them over. Unlike the chord strip this does measure: a page is made of
+whole lines, and only the browser knows how tall a wrapped line is.
+
+- **One column** (a phone, always; a wide screen that asked for it) still scrolls by hand too.
+  A turn moves on a screenful and brings the last whole line to the top, **marked with a rule
+  in the margin** — the line you were on, so the eye lands there rather than searching. A split
+  on a phone was ruled out: there is no room for two.
+- **Two pages** where there is room (`useTwoPagesFit`: at least 900 × 560, so a phone on its
+  side stays one column), on by default and switched per device. Nothing scrolls. Both pages
+  draw the whole song, slid up to their first line and clipped after their last whole one. They
+  **roll**: a tap turns the page you finished, never the one you are reading, so the tap can
+  come any time while reading it. Each says "Page 3 of 8", the left says "next" when it is
+  ahead of the right, and the page that turned flashes once. Nothing is dimmed: which of the
+  two you are reading is not something the screen can know.
+- **A verse is not split across a turn** if it can help it: when a verse starts below 40% of
+  the page, the turn waits for it. Tried at 60% first, and four-line verses came out cut in two
+  every other page.
+- The first time on a device, the bottom bar says "Tap to turn · top to go back" where it
+  usually says the screen stays on; after one turn it is known, and goes.
+
 **A chord can exist without a song, in My chords — and only there.** This reverses what stood
 here, "there is no such thing as a chord without a song". That was the cure for a real fault:
 "Just one chord" used to open the editor with no song and save to a store of its own

@@ -394,6 +394,16 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   sending, and send whatever is unconfirmed then. `SavedLine`'s half-second damping hides the
   symptom in the UI; this is the cause. Noticed while adding that line; not started.
 
+- **Turning the page with a Flic button.** Rory has Flic buttons, not a pedal; deferred
+  2026-09-25 so the page turns (Done) landed first, on a tap; `turnColumn` and `turnPages` in
+  `FullScreen` are what a key press would call. A page can only hear a button
+  that arrives as a key press, so the Flic has to be paired to the phone as a keyboard (Flic 2's
+  HID mode), not driven through the Flic app. **Unverified, and the first thing to find out:**
+  which keys it can send. Arrow keys, Page Down, Space or Enter are catchable; volume and media
+  keys are taken by the phone and never reach a web page. Hoped-for mapping if it can send
+  distinct keys: click forward, double click back, hold back to the top. Start with a small key
+  logger on the full-screen page and press the button at it.
+
 - **A service worker, so the offline promise is true of the app and not just the data.** The
   README says it "works with no signal", and the data does — but there is no service worker, so
   a cold load on a dead connection gets nothing at all. On localhost you never notice. If
@@ -413,6 +423,27 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   capo-relative would silently reinterpret every chord already saved.
 
 ## Done
+
+**Landed 2026-09-25: page turns in full screen.** No rules change: safe to put live any time.
+Asked for as a split
+screen showing two parts of a song, with the worry of losing your place on each side; built as
+page turns, because two free-scrolling halves still need a hand each. See README, "A tap on the
+words turns the page".
+
+- A tap on the words turns; the top quarter goes back. One column (always on a phone — Rory: no
+  room for a split there) turns a screenful and marks the line you were on. Two pages where
+  there is room, rolling: the page you finished turns, the one you are reading stays.
+- **Different from the plan agreed here:** pages are cut by measuring each line
+  (`readItems` → `lib/pages.ts`), not by CSS columns — a column layout cannot repeat the line
+  you were on, and the pure functions want numbers to test. And the page about to change is
+  not dimmed, because the screen cannot know which of the two you are reading; it says "next"
+  and flashes instead.
+- **Checked** in headless Chrome at 390 × 800 and 1280 × 800: turns forward and back in both
+  modes, the carried line marked, verses kept whole. **Not checked:** a real phone's tap (touch,
+  and iOS smooth scrolling), a tablet, and a song with long notes on words, whose lines are
+  taller than a page at the biggest text size — they get a page each, clipped.
+- **Not in this, and not agreed:** pinning the chorus on one side. The song has no named
+  sections (`lyric.ts`), so it would need section markup first.
 
 - **Feedback, with replies and @-mentions** — landed 2026-09-25, **not deployed**. Signed-in only.
   Threads anyone can start and reply to, `@name` to tell someone, and the person @-ed sees it the
