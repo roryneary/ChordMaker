@@ -132,7 +132,7 @@ someone with no songs and the recently opened songs for everyone else. What was 
 - ~~**On a phone, Home is the only door to a new song once you have one.**~~ Songs has a permanent
   "New song" now.
 - ~~**The same choice is worded two ways**~~ — there is one way to start, worded one way.
-- ~~The sidebar's "Start something" only ever starts with the words.~~ It is "Start a song" and
+- ~~The sidebar's "Start something" only ever starts with the words.~~ It is "New song" and
   does what Home's card does.
 - ~~One chord to send to someone still has to be a song.~~ It is made in the Chords tab now (§0a).
 - **Tapping a start card to see what it does leaves an empty "Untitled" behind**, which Home then
@@ -613,16 +613,17 @@ refused.
   with the song keeping its copy; the sidebar count; no page errors.
 
 - **Home welcomes a new player, and holds the songs you opened last; one way to start.** Everyone
-  lands on Home. With no songs on the device it is a welcome — what the app makes, "Start a
+  lands on Home. With no songs on the device it is a welcome — what the app makes, "New
   song", "See a song someone has shared" (a finished sheet explains the app faster than a
   sentence), and "Already have songs? Sign in", because someone with forty songs on another
   device arrives looking exactly like someone with none. With songs it is "What are we
-  playing?" over the four opened last, a way through to all of them, and "Start a new song".
-  **"A song to play" and "Just the chords" are one "Start a song"**, landing on the song screen:
+  playing?" over the four opened last, a way through to all of them, and "New song".
+  **"A song to play" and "Just the chords" are one "New song"**, landing on the song screen:
   both made the same song and differed only in which screen came next, so a new player was asked
   to choose a workflow before seeing either — and the song screen already focuses a fresh song's
   title and offers both the add-chord tile and "Paste the words in". Songs' empty state and the
-  sidebar say the same thing, and **Songs has a permanent "New song"**, without which a phone
+  sidebar say the same thing — "New song" everywhere, since "Start a song" read like starting to
+  play one (changed 2026-09-25) — and **Songs has a permanent "New song"**, without which a phone
   with one song could only start a second from Home.
   **"Recent" is new, and is not `updatedAt`.** The app had no record of what was opened: the
   list was in creation order, re-sorted by last edit only at sign-in, so "pick up where you left

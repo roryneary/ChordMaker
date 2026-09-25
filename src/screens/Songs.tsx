@@ -157,7 +157,7 @@ export default function Songs({
         <div className="songs-empty">
           <p>No songs yet.</p>
           <button type="button" className="btn-primary btn-block" onClick={onStart}>
-            Start a song
+            New song
           </button>
         </div>
       ) : (

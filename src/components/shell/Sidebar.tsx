@@ -101,7 +101,7 @@ export default function Sidebar({
 
       <button type="button" className="nav-item" onClick={onStart}>
         <PlusCircle size={18} />
-        <span>Start a song</span>
+        <span>New song</span>
       </button>
       <button
         type="button"

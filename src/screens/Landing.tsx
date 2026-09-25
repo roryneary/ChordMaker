@@ -123,7 +123,7 @@ export default function Landing({
         <button type="button" className="card choice" onClick={onStart}>
           <span className="choice-head">
             <MusicNotesPlus size={21} />
-            <strong>{isNew ? 'Start a song' : 'Start a new song'}</strong>
+            <strong>New song</strong>
             <CaretRight size={16} />
           </span>
           {isNew && (
