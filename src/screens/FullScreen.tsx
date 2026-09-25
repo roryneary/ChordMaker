@@ -12,6 +12,7 @@ import {
   ArrowsInSimple,
   ArrowsOut,
   Columns,
+  MusicNotesSimple,
   PencilSimple,
   Rows,
   Sun,
@@ -22,6 +23,7 @@ import TextSize from '../components/TextSize';
 import LyricBlock from '../components/lyric/LyricBlock';
 import { useIsDesktop, useTwoPagesFit } from '../components/shell/useBreakpoint';
 import { usePrefs } from '../hooks/usePrefs';
+import { isChordLine, wordsOnly } from '../lib/chordLines';
 import { groupByLine, lineCount } from '../lib/lyric';
 import { NOTE_KIND_LABEL, notesByWord, songWideNotes } from '../lib/notes';
 import {
@@ -34,7 +36,7 @@ import {
   turnBack,
   turnForward,
 } from '../lib/pages';
-import type { Song } from '../types/song';
+import type { Placements, Song } from '../types/song';
 
 interface Props {
   song: Song;
@@ -79,11 +81,16 @@ function useFillScreen(): { can: boolean; on: boolean; toggle: () => void } {
 const NOTES_OPEN_KEY = 'chord-builder:fs-notes-open:v1';
 const TWO_PAGES_KEY = 'chord-builder:fs-two-pages:v1';
 const TURNED_KEY = 'chord-builder:fs-turned:v1';
+const CHORDS_SHOWN_KEY = 'chord-builder:fs-chords-shown:v1';
+
+const NO_PLACEMENTS: Placements = {};
 
 /**
  * A yes/no that is this device's habit — not the song's, and not the player's
- * everywhere: whether the notes are open, whether a wide screen shows two
- * pages, whether this device has turned a page yet.
+ * everywhere: whether the notes are open, whether the chords are drawn or only
+ * the words, whether a wide screen shows two pages, whether this device has
+ * turned a page yet. Not synced prefs: the rules pin a profile's prefs to the
+ * keys they name.
  */
 function useDeviceFlag(key: string, fallback: boolean): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(() => {
@@ -201,6 +208,7 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
   const fill = useFillScreen();
   const hasWords = song.words.length > 0;
   const [notesOpen, setNotesOpen] = useDeviceFlag(NOTES_OPEN_KEY, true);
+  const [chordsShown, setChordsShown] = useDeviceFlag(CHORDS_SHOWN_KEY, true);
   const [twoPages, setTwoPages] = useDeviceFlag(TWO_PAGES_KEY, true);
   const [turned, setTurned] = useDeviceFlag(TURNED_KEY, false);
   const byWord = notesByWord(song.notes);
@@ -214,6 +222,8 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
 
   const lines = lineCount(song.lyric);
   const grouped = groupByLine(song.words, lines);
+  // Words only: the typed chord lines go, and nothing placed is drawn.
+  const shownLines = chordsShown ? grouped : wordsOnly(grouped);
 
   /* --- One column, turned a screenful at a time ----------------------------- */
 
@@ -276,7 +286,7 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
     watch.observe(col);
     watch.observe(body);
     return () => watch.disconnect();
-  }, [paged, song, scale]);
+  }, [paged, song, scale, chordsShown]);
 
   const pageCount = layout.starts.length;
   const shown = clampPair(pair, pageCount);
@@ -318,17 +328,19 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
     let afterGap = false;
     return (
       /* The space between lines shrinks with the words: at the small sizes the
-         point is more of the song on the screen, and fixed gaps would spend it. */
+         point is more of the song on the screen, and fixed gaps would spend it.
+         With the chords off there is no chord row to make room for, so the lines
+         close right up — the whole point of reading words only. */
       <div
         ref={measured === 'scrolled' ? scrolledCol : measured === 'page' ? measuredCol : undefined}
-        className="fs-col"
+        className={`fs-col${chordsShown ? '' : ' fs-col-text'}`}
         style={{
-          gap: Math.round((isDesktop ? 24 : 20) * scale),
+          gap: Math.round((chordsShown ? (isDesktop ? 24 : 20) : isDesktop ? 6 : 4) * scale),
           transform: shift ? `translateY(${-shift}px)` : undefined,
         }}
       >
         {notesPanel}
-        {grouped.map((lineWords, i) => {
+        {shownLines.map((lineWords, i) => {
           if (lineWords.length === 0) {
             afterGap = true;
             return <div key={`g${i}`} className="lyric-gap" aria-hidden="true" />;
@@ -344,15 +356,25 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
               data-item=""
               data-stanza={stanza ? '' : undefined}
             >
-              <LyricBlock
-                lyric={lineWords.map((w) => w.text).join(' ')}
-                words={lineWords.map((w) => ({ ...w, line: 0 }))}
-                placements={song.placements}
-                nameOf={nameOf}
-                sizes={sizes}
-                notes={byWord}
-                notesInline
-              />
+              {chordsShown && isChordLine(lineWords) ? (
+                // Chords typed into the lyric: drawn as chords, not as a dimmed line of words.
+                <p
+                  className="lyric-line typed-chords"
+                  style={{ fontSize: Math.max(sizes.chord, sizes.word * 0.75) }}
+                >
+                  {lineWords.map((w) => w.text).join(' ')}
+                </p>
+              ) : (
+                <LyricBlock
+                  lyric={lineWords.map((w) => w.text).join(' ')}
+                  words={lineWords.map((w) => ({ ...w, line: 0 }))}
+                  placements={chordsShown ? song.placements : NO_PLACEMENTS}
+                  nameOf={nameOf}
+                  sizes={sizes}
+                  notes={byWord}
+                  notesInline
+                />
+              )}
             </div>
           );
         })}
@@ -403,6 +425,18 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
           {kicker && <em className="fs-kicker">{kicker}</em>}
           <span>{song.title.trim() || 'Untitled'}</span>
         </span>
+        {hasWords && (
+          <button
+            type="button"
+            className={`btn-ghost fs-chords-toggle${chordsShown ? '' : ' is-off'}`}
+            onClick={() => setChordsShown(!chordsShown)}
+            aria-pressed={chordsShown}
+            title={chordsShown ? 'Hide the chords' : 'Show the chords'}
+          >
+            <MusicNotesSimple size={15} />
+            <span>Chords</span>
+          </button>
+        )}
         <TextSize />
         {fill.can && (
           <button
@@ -439,7 +473,7 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
           row it wrapped onto would come straight out of the words, and the words
           are what the screen is for. Nothing to show, no strip. With no words the
           chords are the whole song, and get the page instead (below). */}
-      {song.chords.length > 0 && hasWords && (
+      {song.chords.length > 0 && hasWords && chordsShown && (
         <ul className={`fs-chords${isDesktop ? ' fs-chords-wide' : ''}`} aria-label="The chords">
           {song.chords.map((chord) => (
             <li key={chord.id}>

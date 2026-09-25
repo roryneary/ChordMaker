@@ -605,6 +605,28 @@ button.capo-chip.is-unset:hover {
 
 .fs-wide .fs-col { gap: 24px; }
 
+/* Words only. A line with no chord on it is dimmed as "not chorded yet" while
+   the chords are showing; with them off that is every line, and there is
+   nothing left to say, so the words are read at full strength. */
+.fs-col-text .lyric-bare { color: var(--color-text); }
+.fs-col-text .lyric-line { line-height: 1.3; }
+
+/* Chords typed into the lyric as a line of their own, drawn as chords. */
+.typed-chords {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  color: var(--color-accent);
+  white-space: pre-wrap;
+}
+
+.fs-chords-toggle { flex: none; gap: 5px; padding: 6px 8px; font-size: 13px; }
+.fs-chords-toggle.is-off { color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+.fs-chords-toggle.is-off span { text-decoration: line-through; }
+@media (max-width: 480px) {
+  .fs-chords-toggle { padding: 6px 4px; }
+  .fs-chords-toggle svg { display: none; }
+}
+
 .fs-bottom {
   flex: none;
   display: flex;

@@ -52,6 +52,9 @@ Playlists have landed (see Done). What is left, in order:
    The hard part is the lyric blob — chord lines typed above the words need detecting and
    attaching to the word beneath by column. Names that match the 48-shape library get real
    diagrams for free. Needs `artist` from step 1 to land first.
+   **The detecting half exists now** (2026-09-25): `isChordLine` in `src/lib/chordLines.ts`, for
+   the reading view's chords on/off. The column half does not — `tokenise` throws spacing away,
+   so the import has to read columns from the raw blob before the words are made.
    **And it will meet the storage ceiling.** Measured on 2026-09-20: every word carries a
    36-character id, so a typical 250-word song is about 25 kB, not the "well under 20 kB" §2
    assumed. `localStorage` holds roughly 5 MB, which is about **200 songs** — and `saveStore`
@@ -424,6 +427,19 @@ Carried over from the README's "Not built" section — deliberately deferred, no
 
 ## Done
 
+- **Chords on and off in the reading view** — landed 2026-09-25. One button in Play it's top bar;
+  off, the song is words only: no strip, no chord rows, lines closed up and none dimmed, so far more
+  of a song fits the screen. Chords **typed into the lyric** as their own lines are recognised
+  (`src/lib/chordLines.ts`: more than one "/" on a line settles it, else every token a chord or
+  filler) — drawn as chords with the chords on, left out with them off. Remembered per device, not
+  a synced pref, so **no rules change**. README, "Screens".
+  **Checked 2026-09-25** in headless Chrome at 390 px and 1280 px, signed out: a song of typed chord
+  lines and one with placed chords, each on and off; the gap an intro line leaves closed up; the
+  choice surviving a reload; no page errors.
+  *Noticed:* on a phone the top bar is now tight enough that the song's title shows as a few
+  letters. *Not built:* typed chord lines sit on a line of their own, not over their words by
+  column — `tokenise` does not keep spacing.
+
 **Landed 2026-09-25: page turns in full screen.** No rules change: safe to put live any time.
 Asked for as a split
 screen showing two parts of a song, with the worry of losing your place on each side; built as
@@ -442,6 +458,9 @@ words turns the page".
   modes, the carried line marked, verses kept whole. **Not checked:** a real phone's tap (touch,
   and iOS smooth scrolling), a tablet, and a song with long notes on words, whose lines are
   taller than a page at the biggest text size — they get a page each, clipped.
+- **Built beside chords on and off** (above) and fitted together after: a turn measures
+  whatever is drawn, so words only turns by the closer-set lines, and the two pages are cut
+  again when the chords go on or off.
 - **Not in this, and not agreed:** pinning the chorus on one side. The song has no named
   sections (`lyric.ts`), so it would need section markup first.
 

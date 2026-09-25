@@ -154,6 +154,19 @@ shrink with the words, and chord names stop at 10px. **Fill the screen** uses th
 full screen — no address bar, no tabs — and is drawn only where the page is allowed to ask
 (`document.fullscreenEnabled`; an iPhone is not, outside video).
 
+**Chords on and off is one button in the reading view's top bar.** Off, the song is words only:
+no chord strip, no chord row over any word, the lines closed right up, and none of them dimmed —
+the dimming means "not chorded yet", and with the chords off that says nothing. It is for more of
+the song on the screen, and for the many songs whose chords were never placed on words at all.
+Plenty of those have the chords **typed into the lyric** as lines of their own ("G / C / G / D"),
+which is how StreetPerformer kept every song; `lib/chordLines.ts` tells those lines from words, so
+with the chords on they are drawn as chords, and off they go with the rest (`wordsOnly`, which
+also closes up the double gap an intro line leaves). A line with more than one "/" is always
+chords; otherwise every token has to be a chord symbol or chord-line filler. It is a guess about
+text, not a speller, and it cannot put a typed line back over its words by column: `tokenise`
+does not keep spacing. The choice is this device's, like the notes panel, rather than a synced
+pref — `validPrefs` in the rules names the profile's keys exactly.
+
 **"Play it" is a named button, because full screen is the point of the app.** On a phone the
 song screen's action bar holds both ways out in words — "Play it", the wider half, and "Share
 or print" beside it. It used to hold only "Looks right", which goes to Ready, with full screen
