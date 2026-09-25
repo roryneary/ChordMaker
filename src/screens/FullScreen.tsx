@@ -12,6 +12,7 @@ import {
   ArrowsInSimple,
   ArrowsOut,
   Columns,
+  GearSix,
   MusicNotesSimple,
   PencilSimple,
   Rows,
@@ -209,6 +210,7 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
   const hasWords = song.words.length > 0;
   const [notesOpen, setNotesOpen] = useDeviceFlag(NOTES_OPEN_KEY, true);
   const [chordsShown, setChordsShown] = useDeviceFlag(CHORDS_SHOWN_KEY, true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [twoPages, setTwoPages] = useDeviceFlag(TWO_PAGES_KEY, true);
   const [turned, setTurned] = useDeviceFlag(TURNED_KEY, false);
   const byWord = notesByWord(song.notes);
@@ -437,29 +439,17 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
             <span>Chords</span>
           </button>
         )}
-        <TextSize />
-        {fill.can && (
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={fill.toggle}
-            aria-label={fill.on ? 'Stop filling the screen' : 'Fill the screen'}
-            title={fill.on ? 'Stop filling the screen' : 'Fill the screen'}
-          >
-            {fill.on ? <ArrowsIn size={19} /> : <ArrowsOut size={19} />}
-          </button>
-        )}
-        {hasWords && twoFit && (
-          <button
-            type="button"
-            className="btn-ghost fs-edit"
-            onClick={() => setTwoPages(!twoPages)}
-            title={twoPages ? 'One column that scrolls' : 'Two pages side by side'}
-          >
-            {twoPages ? <Rows size={15} /> : <Columns size={15} />}
-            {twoPages ? 'One column' : 'Two pages'}
-          </button>
-        )}
+        <button
+          type="button"
+          className={`icon-btn fs-settings-btn${settingsOpen ? ' is-on' : ''}`}
+          onClick={() => setSettingsOpen(!settingsOpen)}
+          aria-expanded={settingsOpen}
+          aria-controls="fs-settings"
+          aria-label="Reading settings"
+          title="Reading settings"
+        >
+          <GearSix size={19} />
+        </button>
         {onEdit && (
           <button type="button" className="btn-ghost fs-edit" onClick={onEdit}>
             <PencilSimple size={15} />
@@ -467,6 +457,33 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
           </button>
         )}
       </div>
+
+      {/* Set once and left: behind the gear, so the bar has room for the title.
+          Chords stays in the bar — that one is flipped mid-song. Closed each time
+          a song opens; it pushes the words down rather than covering them. */}
+      {settingsOpen && (
+        <div className="fs-settings" id="fs-settings">
+          <span className="fs-settings-label">Text size</span>
+          <TextSize />
+          {fill.can && (
+            <button type="button" className="btn-ghost fs-edit" onClick={fill.toggle}>
+              {fill.on ? <ArrowsIn size={15} /> : <ArrowsOut size={15} />}
+              {fill.on ? 'Stop filling the screen' : 'Fill the screen'}
+            </button>
+          )}
+          {hasWords && twoFit && (
+            <button
+              type="button"
+              className="btn-ghost fs-edit"
+              onClick={() => setTwoPages(!twoPages)}
+              title={twoPages ? 'One column that scrolls' : 'Two pages side by side'}
+            >
+              {twoPages ? <Rows size={15} /> : <Columns size={15} />}
+              {twoPages ? 'One column' : 'Two pages'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* The shapes, pinned: outside the scroller, so they are still there at the
           last verse. One row that scrolls sideways rather than wrapping — every

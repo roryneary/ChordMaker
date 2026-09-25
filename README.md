@@ -154,6 +154,11 @@ shrink with the words, and chord names stop at 10px. **Fill the screen** uses th
 full screen — no address bar, no tabs — and is drawn only where the page is allowed to ask
 (`document.fullscreenEnabled`; an iPhone is not, outside video).
 
+**The reading bar holds only what is used mid-song:** Back, the title, Chords, a gear and Edit.
+Text size, Fill the screen and One column / Two pages are set once and left, so they sit in a
+row the gear opens under the bar — closed each time a song opens, and pushing the words down
+rather than covering them. With all of them in the bar, a phone showed the title as "A l…".
+
 **Chords on and off is one button in the reading view's top bar.** Off, the song is words only:
 no chord strip, no chord row over any word, the lines closed right up, and none of them dimmed —
 the dimming means "not chorded yet", and with the chords off that says nothing. It is for more of

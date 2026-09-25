@@ -436,8 +436,9 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   **Checked 2026-09-25** in headless Chrome at 390 px and 1280 px, signed out: a song of typed chord
   lines and one with placed chords, each on and off; the gap an intro line leaves closed up; the
   choice surviving a reload; no page errors.
-  *Noticed:* on a phone the top bar is now tight enough that the song's title shows as a few
-  letters. *Not built:* typed chord lines sit on a line of their own, not over their words by
+  *Noticed:* on a phone the top bar was then tight enough that the song's title showed as a few
+  letters. **Fixed 2026-09-25:** text size, Fill the screen and One column / Two pages moved
+  behind a gear into a row under the bar; the title has 158 px at 390, 128 at 360. *Not built:* typed chord lines sit on a line of their own, not over their words by
   column — `tokenise` does not keep spacing.
 
 **Landed 2026-09-25: page turns in full screen.** No rules change: safe to put live any time.

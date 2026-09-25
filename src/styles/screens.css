@@ -852,9 +852,29 @@ button.capo-chip.is-unset:hover {
 .fs-edit { flex: none; gap: 5px; padding: 6px 8px; font-size: 13px; }
 @media (max-width: 480px) {
   .fs-top { gap: 6px; padding: 4px 12px 12px; }
-  .fs-top .text-size-now { min-width: 38px; }
-  .fs-top .seg.text-size button { min-width: 32px; }
 }
+
+/* Reading settings: set once and left, so they wait behind the gear and the
+   bar keeps its room for the title. A row under the bar, wrapping on a phone. */
+.fs-settings-btn.is-on {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.fs-settings {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 0 20px 12px;
+  border-bottom: 1px solid var(--color-divider);
+}
+/* Each phrase in the bottom bar stays whole; at 360 px the first-time hint
+   otherwise broke "Key of G" over two lines. */
+.fs-bottom > span:not(.spacer) { white-space: nowrap; }
+.fs-settings-label { font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+@media (min-width: 1024px) { .fs-settings { padding: 0 30px 14px; } }
+@media (max-width: 480px) { .fs-settings { padding: 0 12px 12px; } }
 
 /* No words: the chords are the song, so they get the page. */
 .fs-chords-only {
