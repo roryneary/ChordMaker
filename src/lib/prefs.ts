@@ -87,3 +87,14 @@ export function withPref<K extends keyof Omit<Prefs, 'updatedAt'>>(
   if (prefs[key] === value) return prefs;
   return { ...prefs, [key]: value, updatedAt: Math.max(now, prefs.updatedAt + 1) };
 }
+
+/**
+ * The reading view's word and chord sizes, in px, at a text scale. Here rather
+ * than in FullScreen so the settings sample is drawn at exactly the size a song
+ * will be. The chord holds the ~0.55 ratio to the words, but never drops below
+ * 10px, so at the smallest steps a name is still read at a glance.
+ */
+export function readingSizes(desktop: boolean, scale: number): { word: number; chord: number } {
+  const base = desktop ? { word: 27, chord: 15 } : { word: 23, chord: 14 };
+  return { word: base.word * scale, chord: Math.max(10, base.chord * scale) };
+}

@@ -37,6 +37,7 @@ import {
   turnBack,
   turnForward,
 } from '../lib/pages';
+import { readingSizes } from '../lib/prefs';
 import type { Placements, Song } from '../types/song';
 
 interface Props {
@@ -217,10 +218,7 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
   const wide = songWideNotes(song.notes);
   const paged = hasWords && twoFit && twoPages;
 
-  const base = isDesktop ? { word: 27, chord: 15 } : { word: 23, chord: 14 };
-  // The chord scales with the words, holding the ~0.55 ratio —
-  // but never below 10px, so at the smallest steps a name is still read at a glance.
-  const sizes = { word: base.word * scale, chord: Math.max(10, base.chord * scale) };
+  const sizes = readingSizes(isDesktop, scale);
 
   const lines = lineCount(song.lyric);
   const grouped = groupByLine(song.words, lines);

@@ -784,7 +784,7 @@ button.capo-chip.is-unset:hover {
 /* The phone header's second line: what the song is, then whether it is kept. */
 .song-titles-sub { display: flex; align-items: center; gap: 6px; min-width: 0; }
 
-/* --- How you play -------------------------------------------------------- */
+/* --- Settings ------------------------------------------------------------ */
 /* The songs page frame, so it scrolls and sits where the list screens do. */
 .settings {
   flex: 1;
@@ -808,9 +808,25 @@ button.capo-chip.is-unset:hover {
   font-size: 13px;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
-.settings-size { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.settings-size > span { min-width: 0; }
-.settings-preview { display: flex; gap: 20px; margin-top: 8px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.settings-row > span { min-width: 0; }
+.settings-preview { display: flex; gap: 20px; margin: 8px 0 22px; }
+/* The sample verse, at the reading view's own sizes. A card, so it reads as
+   a picture of a song rather than as more of the settings. */
+.settings-sample {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* Upright / Sideways. Both words at one size: `.seg`'s growing letters are
+   the text-size ramp, not a thing every choice should do. */
+.seg.chord-orientation { flex: none; box-shadow: inset 0 0 0 1px var(--color-divider); }
+.seg.chord-orientation button { font-size: 13px; min-height: 32px; }
 .settings-preview figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .settings-preview figcaption { font-size: 13px; font-weight: 500; }
 .settings-signin { margin: 18px 0 0 -8px; }
@@ -1184,3 +1200,4 @@ button.capo-chip.is-unset:hover {
 @media (prefers-reduced-motion: reduce) {
   .fs-page-flash { animation-duration: 1ms; }
 }
+.songs-view-label { margin-right: 4px; color: color-mix(in srgb, var(--color-text) 70%, transparent); }

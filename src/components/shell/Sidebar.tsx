@@ -196,7 +196,7 @@ export default function Sidebar({
           onClick={() => onGo({ name: 'settings' })}
         >
           <SlidersHorizontal size={18} />
-          <span>How you play</span>
+          <span>Settings</span>
         </button>
         {/* The count is only what is waiting for you, and only when there is
             some: how many threads there are is nobody's business on every load. */}
@@ -206,7 +206,7 @@ export default function Sidebar({
           onClick={() => onGo({ name: 'feedback' })}
         >
           <ChatCircleText size={18} />
-          <span>Feedback</span>
+          <span>App ideas, problems…</span>
           {mentionCount > 0 && (
             <em className="nav-count is-alert" aria-label={`${mentionCount} waiting for you`}>
               {mentionCount}

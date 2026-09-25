@@ -67,7 +67,7 @@ draws **leftmost**. Left-to-right conversion happens only in `layout.ts`, guarde
 **Which way round a chord is drawn belongs to the player looking at it, not to the chord.**
 A chord is stored one way for everybody; a left-hander who writes a song and a right-hander
 who plays it read the same copy, each drawn their own way. So there is no field on a chord and
-no migration — the player's prefs (below, "How you play") hand an `Orient` to the renderer.
+no migration — the player's prefs (below, "Settings") hand an `Orient` to the renderer.
 Everything in `layout.ts` still describes the canonical diagram, upright and right-handed, and
 every drawn point goes through one function, `place`, on its way out: mirrored across the
 strings for a left-hander; turned so the neck runs across like tab — nut on the left, string 1
@@ -303,9 +303,9 @@ which would be one editor on top of another. Otherwise it is a place. The route 
 your own, `myChord`, is looked through by `openSongId` like the library is, so that reaching it
 with a blank song underneath can never get that song thrown away.
 
-## How you play
+## Settings
 
-Left-handed, chords on their side, and the reading view's text size are **the player's, not a
+Chord orientation (upright or sideways), mirroring for left-handed players, and the reading view's text size are **the player's, not a
 song's** (`lib/prefs.ts`, `usePrefs`). They are kept in `localStorage`, read first like songs, so
 a signed-out player has them and nothing waits on a signal. Signed in, they are mirrored to
 `users/{uid}.prefs` — the profile document that holds the handle, which `useAuth` already
@@ -314,9 +314,12 @@ device's it goes up; a change is sent as it is made, and a failure is not surfac
 are not work. Only a finished account (one with a handle) syncs them: the rules will not let the
 profile be written without one.
 
-They live on a screen of their own, **How you play** (`#/settings`), reached from the sidebar,
-the phone's account screen, and a button on Songs — which also carries a switch for chords on
-their side, the one pref that changes the page you are looking at. Everything drawn follows
+They live on a screen of their own, **Settings** (`#/settings`), reached from the foot of the
+sidebar beside the account, the phone's account screen, and a button on Songs — which also
+carries the Upright / Sideways choice, the one pref that changes the page you are looking at.
+Text size shows a chorded verse of *House of the Rising Sun* drawn at the reading view's own
+sizes (`readingSizes` in `lib/prefs.ts`, which full screen uses too), so a percentage is
+something you can see. Everything drawn follows
 them, including what is printed and saved: what you send is what you see.
 
 ## Notes

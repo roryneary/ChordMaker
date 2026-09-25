@@ -514,6 +514,13 @@ refused.
   the data is the same for everyone — everywhere, including the editor and what is printed or
   saved. Closes "Left-handed mirroring" from Later. README, "How you play" and the orientation
   paragraph under "How it holds together".
+  **Renamed 2026-09-25:** the screen is **Settings**, at the foot of the sidebar by the account.
+  "Left-handed" read as a statement about you rather than a thing it did, so it is **Mirror the
+  chords**, "for playing left-handed". "Chords on their side" is **Chord orientation: Upright /
+  Sideways**, on Settings and on Songs. Text size shows a chorded verse of *House of the Rising
+  Sun* at the reading view's real sizes (`readingSizes`). The sidebar's Feedback reads **"App
+  ideas, problems…"**, as does its row on the phone's account screen; the screen's own heading
+  is still "Feedback".
   *Open:* whether "Send the chords" to the band should always go upright and right-handed, rather
   than the sender's way round. Today it follows the sender, like everything else.
 - **Arrange the chords** a song pins at the top: earlier/later arrows, and "Order as played" by
@@ -628,7 +635,7 @@ refused.
   (2026-09-25). A new player does better with a song someone has already made than with a blank
   one, so the ways in are Songs and Shared songs, and making one is a button on Songs. **Songs'
   empty state leads with "Find a shared song"**, with "New song" under it, and drops its "Find songs
-  other people have shared" link while empty so it doesn't say the same thing twice. "How you play"
+  other people have shared" link while empty so it doesn't say the same thing twice. Settings
   and Feedback moved down beside the account chip, because they are about the player and the app,
   not the songs. *Home's first-visit card still leads with "New song"* and offers the shared songs
   as the smaller link. That is the next thing to turn round if shared-first is the rule.

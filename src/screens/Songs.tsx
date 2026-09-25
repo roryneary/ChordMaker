@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Plus, SlidersHorizontal, UsersThree } from '@phosphor-icons/react';
+import ChordOrientation from '../components/ChordOrientation';
 import SongCard from '../components/SongCard';
 import AddToPlaylistSheet from '../components/AddToPlaylistSheet';
 import DeleteSongSheet from '../components/DeleteSongSheet';
-import { usePrefs } from '../hooks/usePrefs';
 import { type Membership, membershipBySong } from '../lib/playlists';
 import type { SharingBlocked } from '../components/ShareLinkSheet';
 import type { Playlist } from '../types/playlist';
@@ -66,7 +66,6 @@ export default function Songs({
   onSettings,
 }: Props) {
   const n = songs.length;
-  const { prefs, setPref } = usePrefs();
   const memberships = useMemo(() => membershipBySong(playlists), [playlists]);
   const [addingId, setAddingId] = useState<string | null>(null);
   const adding = songs.find((s) => s.id === addingId) ?? null;
@@ -134,22 +133,16 @@ export default function Songs({
         )}
         {/* The one pref worth a switch where the chords are: it changes every
             diagram on the page at once, so you see what it does. The rest are
-            one tap further, under "How you play". */}
+            one tap further, under Settings. */}
         <span className="songs-view">
-          <label>
-            <input
-              type="checkbox"
-              checked={prefs.sideways}
-              onChange={(e) => setPref('sideways', e.target.checked)}
-            />
-            Chords on their side
-          </label>
+          <span className="songs-view-label">Chord orientation</span>
+          <ChordOrientation />
           <button
             type="button"
             className="icon-btn"
             onClick={onSettings}
-            aria-label="How you play"
-            title="How you play"
+            aria-label="Settings"
+            title="Settings"
           >
             <SlidersHorizontal size={17} />
           </button>

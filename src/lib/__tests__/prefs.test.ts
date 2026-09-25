@@ -3,6 +3,7 @@ import {
   DEFAULT_PREFS,
   TEXT_SCALES,
   nearestScale,
+  readingSizes,
   newerPrefs,
   parsePrefs,
   stepScale,
@@ -68,5 +69,21 @@ describe("the player's prefs", () => {
   it('lets a choice made signed out beat an account that never chose', () => {
     const local = withPref(DEFAULT_PREFS, 'textScale', 0.7, 50);
     expect(newerPrefs(local, parsePrefs(null))).toBe(local);
+  });
+});
+
+describe('readingSizes', () => {
+  it('draws the reading view at its design sizes at 100%', () => {
+    expect(readingSizes(true, 1)).toEqual({ word: 27, chord: 15 });
+    expect(readingSizes(false, 1)).toEqual({ word: 23, chord: 14 });
+  });
+
+  it('scales words and chords together', () => {
+    expect(readingSizes(false, 1.25)).toEqual({ word: 28.75, chord: 17.5 });
+  });
+
+  it('never draws a chord name below 10px', () => {
+    expect(readingSizes(false, 0.5).chord).toBe(10);
+    expect(readingSizes(false, 0.5).word).toBe(11.5);
   });
 });

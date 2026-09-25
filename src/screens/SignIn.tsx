@@ -28,7 +28,7 @@ interface Props {
   /** How many songs the account screen's chip leads to. */
   songCount: number;
   onOpenSongs: () => void;
-  /** Left-handed, sideways, text size: the player's, reached from their account. */
+  /** Chord orientation, mirroring, text size: the player's, reached from their account. */
   onSettings: () => void;
   /** Feedback on the app — on a phone, this screen is the way in. */
   onFeedback: () => void;
@@ -179,19 +179,19 @@ export default function SignIn({
 
         <button type="button" className="user-chip is-action account-settings" onClick={onSettings}>
           <span className="user-meta">
-            <strong>How you play</strong>
-            <em>Left-handed, chords on their side, text size</em>
+            <strong>Settings</strong>
+            <em>Chord orientation, mirroring, text size</em>
           </span>
           <CaretRight size={16} />
         </button>
 
         <button type="button" className="user-chip is-action account-feedback" onClick={onFeedback}>
           <span className="user-meta">
-            <strong>Feedback</strong>
+            <strong>App ideas, problems…</strong>
             <em>
               {mentionCount > 0
                 ? `${mentionCount} waiting for you`
-                : 'Ideas, problems, and the conversation about them'}
+                : 'Everyone signed in can read them and reply'}
             </em>
           </span>
           {mentionCount > 0 && <span className="tag tag-alert">{mentionCount}</span>}
