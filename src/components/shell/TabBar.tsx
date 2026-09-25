@@ -12,6 +12,8 @@ interface Props {
   account: Account | null;
   route: Route;
   onGo: (route: Route) => void;
+  /** Feedback posts that @ this player: a dot on the account tab, where feedback lives. */
+  mentionCount: number;
 }
 
 /* Each tab is named for what is behind it. There was a "Gig bag" here, which
@@ -38,7 +40,7 @@ const ITEMS = [
  * of the desktop nav — without it there was no way to reach sign-in on a
  * phone at all, only the sidebar had the door in.
  */
-export default function TabBar({ account, route, onGo }: Props) {
+export default function TabBar({ account, route, onGo, mentionCount }: Props) {
   const activeKey =
     route.name === 'library'
       ? 'chords'
@@ -50,7 +52,12 @@ export default function TabBar({ account, route, onGo }: Props) {
           ? 'songs'
           : route.name === 'playlists' || route.name === 'playlist'
             ? 'playlists'
-            : route.name === 'signIn' || route.name === 'settings'
+            : /* Feedback is reached from the account screen on a phone:
+                 there is no room for a sixth tab. */
+              route.name === 'signIn' ||
+                route.name === 'settings' ||
+                route.name === 'feedback' ||
+                route.name === 'feedbackThread'
               ? 'account'
               : '';
 
@@ -80,9 +87,15 @@ export default function TabBar({ account, route, onGo }: Props) {
         type="button"
         className={`tab-item${activeKey === 'account' ? ' is-active' : ''}`}
         aria-current={activeKey === 'account' ? 'page' : undefined}
+        aria-label={
+          mentionCount > 0 ? `Account, ${mentionCount} waiting for you in feedback` : undefined
+        }
         onClick={() => onGo({ name: 'signIn' })}
       >
-        <UserCircle size={21} weight={account?.handle ? 'fill' : 'regular'} />
+        <span className="tab-icon">
+          <UserCircle size={21} weight={account?.handle ? 'fill' : 'regular'} />
+          {mentionCount > 0 && <span className="tab-dot" />}
+        </span>
         <span>{account?.handle ? 'Account' : 'Sign in'}</span>
       </button>
     </nav>

@@ -43,6 +43,14 @@ describe('which chrome a screen gets', () => {
     expect(desktop({ name: 'sharedSong', shareId: 'sh1' })).toBe('sidebar');
   });
 
+  /* The same for feedback: the list is browsed, and one thread has a reply
+     box that a tab bar would sit under, inviting a walk away mid-sentence. */
+  it('keeps the tabs on the feedback, and withholds them from one thread', () => {
+    expect(mobile({ name: 'feedback' }, LANDING)).toBe('tabs');
+    expect(mobile({ name: 'feedbackThread', threadId: 't1' }, { name: 'feedback' })).toBe('none');
+    expect(desktop({ name: 'feedbackThread', threadId: 't1' })).toBe('sidebar');
+  });
+
   /* Opening the library from the song list is going somewhere, not pausing
      half-way through a song — without this it lost its tab bar and grew a
      Back button, because anything that was not the landing page counted as

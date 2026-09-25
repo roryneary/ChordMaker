@@ -1,5 +1,7 @@
-import { CaretRight, MusicNotesPlus, SignIn, UsersThree } from '@phosphor-icons/react';
+import { At, CaretRight, MusicNotesPlus, SignIn, UsersThree } from '@phosphor-icons/react';
 import type { Song } from '../types/song';
+import type { Mention } from '../types/feedback';
+import { authorLabel } from '../lib/feedback';
 import SongCard from '../components/SongCard';
 import { ChordCreatorLockup } from '../components/Brand';
 
@@ -12,6 +14,10 @@ interface Props {
   onResume: (songId: string) => void;
   onAllSongs: () => void;
   onFindShared: () => void;
+  /** Feedback posts that @ this player, not yet looked at. */
+  mentions: Mention[];
+  /** Where the notice goes: the thread, or the list when more than one is waiting. */
+  onOpenMentions: () => void;
   /** Absent when there is nobody to sign in as: signed in already, or no database. */
   onSignIn?: () => void;
 }
@@ -44,6 +50,8 @@ export default function Landing({
   onResume,
   onAllSongs,
   onFindShared,
+  mentions,
+  onOpenMentions,
   onSignIn,
 }: Props) {
   const isNew = songCount === 0;
@@ -70,6 +78,24 @@ export default function Landing({
           </>
         )}
       </h1>
+
+      {/* The notice for being @-ed, on the screen everybody opens the app to.
+          One line, and only while there is something: it goes once looked at. */}
+      {mentions.length > 0 && (
+        <button
+          type="button"
+          className="card landing-mention"
+          onClick={onOpenMentions}
+        >
+          <At size={18} weight="bold" />
+          <span>
+            {authorLabel({ display: mentions[0].fromDisplay, handle: mentions[0].fromHandle })}{' '}
+            mentioned you in “{mentions[0].title}”
+            {mentions.length > 1 && <em> and {mentions.length - 1} more in feedback</em>}
+          </span>
+          <CaretRight size={16} />
+        </button>
+      )}
 
       {isNew && (
         <p className="landing-lede">

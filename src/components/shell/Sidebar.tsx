@@ -1,4 +1,5 @@
 import {
+  ChatCircleText,
   GridFour,
   MusicNotes,
   PencilSimple,
@@ -30,6 +31,8 @@ interface Props {
   playlistCount: number;
   /** Added to the built-in shapes for the library's count: it holds both now. */
   myChordCount: number;
+  /** Feedback posts that @ this player, not yet looked at. */
+  mentionCount: number;
   currentId: string | null;
   onGo: (route: Route) => void;
   onOpenSong: (songId: string) => void;
@@ -77,6 +80,7 @@ export default function Sidebar({
   recent,
   playlistCount,
   myChordCount,
+  mentionCount,
   currentId,
   onGo,
   onOpenSong,
@@ -85,6 +89,7 @@ export default function Sidebar({
   const inPlaylists =
     route.name === 'playlists' || route.name === 'playlist' || route.name === 'playlistAdd';
   const inShared = route.name === 'shared' || route.name === 'sharedSong';
+  const inFeedback = route.name === 'feedback' || route.name === 'feedbackThread';
   const shown = recent;
   const rest = songs.length - shown.length;
 
@@ -144,6 +149,21 @@ export default function Sidebar({
       >
         <SlidersHorizontal size={18} />
         <span>How you play</span>
+      </button>
+      {/* The count is only what is waiting for you, and only when there is
+          some: how many threads there are is nobody's business on every load. */}
+      <button
+        type="button"
+        className={`nav-item${inFeedback ? ' is-active' : ''}`}
+        onClick={() => onGo({ name: 'feedback' })}
+      >
+        <ChatCircleText size={18} />
+        <span>Feedback</span>
+        {mentionCount > 0 && (
+          <em className="nav-count is-alert" aria-label={`${mentionCount} waiting for you`}>
+            {mentionCount}
+          </em>
+        )}
       </button>
 
       <hr className="nav-rule" />

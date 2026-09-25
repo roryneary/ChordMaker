@@ -514,6 +514,53 @@ is refused.** The sync line says so, but only once it has happened. Size limits 
 mirrored in `lib/sharedSong.ts` so the words editor can say "too long" first: the rule of thumb
 is four times the longest real song (Bat Out of Hell, ~4,500 characters), so 20,000.
 
+## Feedback
+
+Anyone signed in can say what they would change about the app, and everyone signed in can read
+it and reply (`#/feedback`; the sidebar, and on a phone the account screen, since there is no
+room for a sixth tab). **It is the one part of the app that is not local-first**, on purpose: it is
+a conversation, other people's words, and it is read from the database as it is now, like Shared
+songs. Nothing of it goes near the song store. It says so when there is no signal rather than
+showing a stale list, and a post that cannot go keeps what was typed.
+
+**Signed-in only, reading as well as writing.** A post goes out under a handle, and `holdsHandle`
+in the rules checks the handle is the poster's, so feedback is never anonymous and never an email.
+
+**Three collections, always written in one batch** (`lib/feedbackSync.ts`):
+
+```
+feedback/{threadId}                 title, who started it, postCount, lastPostId, lastBy
+feedback/{threadId}/posts/{postId}  body, author, mentions: [uid]
+mentions/{postId}_{uid}             a notice for one person, until they look
+```
+
+The opening post is post one, not a field on the thread, so an @ in it works exactly as one in a
+reply. The thread names its newest post and the rules check each document against the other *as
+the batch leaves them* (`getAfter`): a post cannot exist unless its thread names it, and a thread
+cannot name a post somebody else wrote. The count goes up by `increment`, so two replies at once
+both count.
+
+**@-ing someone is how they hear about it.** `mentionedHandles` (`lib/feedback.ts`, tested) reads
+`@name` where an @ starts a word — not the middle of an email address — and treats a trailing dot
+as the end of the sentence, so a handle that ends in a dot can read and reply but cannot be @-ed.
+Each handle is looked up in `usernames/` before posting, and **a name nobody holds stops the post**
+with that name in the message, rather than posting and quietly telling nobody. At most five people
+per post: each notice is a document read in the rules, and a write is only allowed so many.
+"Reply to @name" on every post puts the @ in for you.
+
+**A notice is its own document, not a field on anyone's profile**, because `users/{uid}` is
+written by its owner and nobody else, without exception. The rules let only the person it names
+read or delete it, and only the post's author write it, only for a uid the post lists, under the id
+`{postId}_{uid}` — so a post cannot ping anyone it does not @, or anyone twice. `useMentions`
+watches your notices while the app is open and signed in, so they are there the next time you open
+it: a badge on Feedback in the sidebar, a dot on the phone's Account tab, a line on Home, and
+"Waiting for you" at the top of the list. **Opening the thread deletes them** — they are notices,
+and the post is the record. A post that @-s you stays picked out in the thread after that, because
+that comes from the post, not the notice.
+
+Nothing can be edited or deleted from the app, threads or posts. If moderation is ever needed, it
+is the console for now.
+
 ## Whether it is really saved
 
 `localStorage` is what the app reads and writes; an account mirrors it to

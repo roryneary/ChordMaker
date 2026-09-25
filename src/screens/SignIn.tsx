@@ -30,6 +30,10 @@ interface Props {
   onOpenSongs: () => void;
   /** Left-handed, sideways, text size: the player's, reached from their account. */
   onSettings: () => void;
+  /** Feedback on the app — on a phone, this screen is the way in. */
+  onFeedback: () => void;
+  /** Feedback posts that @ this player, not yet looked at. */
+  mentionCount: number;
   suggestFrom?: string | null;
   onClaim: (handle: string) => Promise<string>;
   onDone: () => void;
@@ -56,6 +60,8 @@ export default function SignIn({
   songCount,
   onOpenSongs,
   onSettings,
+  onFeedback,
+  mentionCount,
   suggestFrom,
   onClaim,
   onDone,
@@ -176,6 +182,19 @@ export default function SignIn({
             <strong>How you play</strong>
             <em>Left-handed, chords on their side, text size</em>
           </span>
+          <CaretRight size={16} />
+        </button>
+
+        <button type="button" className="user-chip is-action account-feedback" onClick={onFeedback}>
+          <span className="user-meta">
+            <strong>Feedback</strong>
+            <em>
+              {mentionCount > 0
+                ? `${mentionCount} waiting for you`
+                : 'Ideas, problems, and the conversation about them'}
+            </em>
+          </span>
+          {mentionCount > 0 && <span className="tag tag-alert">{mentionCount}</span>}
           <CaretRight size={16} />
         </button>
 

@@ -140,6 +140,49 @@ someone with no songs and the recently opened songs for everyone else. What was 
   leaving. Not covered: closing the tab on a blank song leaves it until it is next opened and
   left, and blanks made before this stay until then too.
 
+### 0c. Feedback: finding people, and a face for them
+
+Agreed 2026-09-25, not started. Feedback itself landed the same day (see Done); these two
+follow it, **in this order**, and neither is started until that has been deployed and checked by
+hand with two accounts — both build on its rules.
+
+**A handle is public, and that is settled.** Rory's call, on Instagram's model: anyone can find any
+username, and a private account still shows its handle. The app already works that way —
+handles are on shared songs and feedback posts, and `usernames/{handle}` is readable by anyone
+signed in, which covers listing. The email stays private; a claim holds only the handle, its
+casing and a uid. (The older note in §3, "a song from a stranger belongs in a pending tray", is
+about *sending songs* to a handle and still stands.)
+
+1. **@ suggestions as you type.** Instagram's shape:
+   - Typing `@` lists the **people in this thread** at once, from the posts already loaded — no
+     read at all.
+   - From one or two characters, **handles that start with what is typed**, from `usernames` by
+     document id (a prefix range, the kind of search Firestore does unaided), debounced, about six.
+     The thread's people come first.
+   - Up/Down, Enter or Tab to pick, Escape to close; a tap on a phone. Picking writes `@handle `.
+   - The word under the caret, and merging the two lists, are pure and tested in `lib/feedback.ts`;
+     the dropdown is one component shared by the new-thread form and the reply box.
+   - No rules change. The five-a-post limit still applies.
+2. **A picked avatar, not a photo.** A colour plus the initial, or one of a dozen icons (guitar,
+   drum, mic, notes…). Shown on feedback posts, in the @ list, on "from @rory" on shared songs,
+   and on the account chip.
+   - **Where it lives is the catch.** `users/{uid}` is readable by its owner only, so an avatar
+     others can see goes on the public claim, `usernames/{handle}`, and is copied onto each post
+     as the name is. That is a rules change to the claim (which today refuses `update` outright,
+     so it would be a narrow update allowing only the avatar field) and to posts' field list.
+   - Copied, so an old post keeps the old avatar after a change, as it keeps an old handle.
+
+**Photos: decided against for now**, each reason on its own enough:
+- **Moderation.** A photo is the one thing here someone could use to show everyone signed in
+  something offensive, and there is no way to take anything down yet except the console.
+- **Storage.** §2 keeps Cloud Storage out and names avatars as what would bring it in. A photo cut
+  to ~96 px (about 5 kB) and stored as text on the claim would avoid Storage — but not moderation.
+- **It undoes the handle.** A handle exists so that sharing never says who you are. Google sign-in
+  already hands the app a photo (`account.photoURL`); showing it without asking would put a
+  Google identity in front of strangers. If photos ever come, that one is opt-in only.
+
+Revisit when somebody actually asks for a photo, and after there is a way to remove one.
+
 ### The sharing, database and sign-in project
 
 These three are one project, not three. Sharing is the design question that decides the
@@ -370,6 +413,35 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   capo-relative would silently reinterpret every chord already saved.
 
 ## Done
+
+- **Feedback, with replies and @-mentions** — landed 2026-09-25, **not deployed**. Signed-in only.
+  Threads anyone can start and reply to, `@name` to tell someone, and the person @-ed sees it the
+  next time they open the app: a badge on Feedback in the sidebar, a dot on the phone's Account
+  tab, a line on Home. Opening the thread clears it. README, "Feedback", has the model.
+  **Deploy the rules first, then push the bundle.** `firestore.rules` gained `feedback/…/posts`
+  and `mentions`. Nothing that exists already changed, so songs are not at risk, but until the
+  rules are live every post is refused. They compiled (`--dry-run` against the project) and have
+  never run: no Java here, no emulator. **Check by hand, with two accounts:** start a thread; reply
+  from the other account with `@` the first; the first sees the badge, dot and Home line after a
+  reload, and they go when the thread is opened; `@nobody` is refused with the name in the
+  message; the thread document has exactly its nine keys and `postCount` counts the opening post.
+  **In the Rules Playground, refused:** reading `feedback` signed out; a post whose thread does not
+  name it; a thread update that changes the title; a mention for a uid the post does not list, or
+  under any id but `{postId}_{uid}`; reading someone else's mention; a sixth mention on a post.
+  **Checked 2026-09-25** in headless Chrome at 390 px and 1280 px, **signed out only**: the sidebar
+  item, the sign-in prompt on the list and on a thread link, the account tab lit on feedback, tabs
+  on the list and none on a thread, no badge or notice, no page errors. The rest waits on the hand
+  check above: posting needs an account, and a test account on the live project was not made.
+  *Open, and each only if missed:*
+  - **The thread's author is not told about replies** unless they are @-ed. It was the ask as put
+    ("at them so that they are notified"); telling the starter of every reply is one more `toUid`
+    the mention rule would need to allow (`== thread.authorUid`), and the obvious next step.
+  - **No way to mark feedback done, or remove it.** Both want an idea of *who runs the app*, which
+    does not exist yet — a uid in the rules, or a custom claim. Until then it is the console.
+  - ~~**No typeahead for @.**~~ Agreed as §0c.1.
+  - **Anyone signed in can @ anyone** by handle, up to five a post. Spam is possible and cheap to
+    stop in the rules later (require the uid to be in the thread) if it happens.
+  - A renamed handle stays on posts already written, as it does on shared songs.
 
 **Landed 2026-09-25, and the rules must be deployed first.** `firestore.rules` changed twice in
 this batch: `users/{uid}` now allows a `prefs` map (`validPrefs`), and a song and a shared copy

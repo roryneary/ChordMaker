@@ -973,3 +973,95 @@ button.capo-chip.is-unset:hover {
   color: var(--color-accent);
 }
 .fs-note p { margin: 2px 0 0; line-height: 1.45; white-space: pre-wrap; }
+
+/* --- Feedback ------------------------------------------------------------ */
+/* What is waiting for you, wherever the way in to feedback is drawn. */
+.nav-count.is-alert {
+  opacity: 1;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  text-align: center;
+}
+.tab-icon { position: relative; display: inline-flex; }
+.tab-dot {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+.signin-account .account-feedback { margin-top: 10px; }
+
+.landing-mention {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 12px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--color-accent), var(--shadow-sm);
+}
+.landing-mention > svg:first-child { flex: none; color: var(--color-accent); }
+.landing-mention > span { flex: 1; min-width: 0; }
+.landing-mention em { font-style: normal; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+
+.feedback { max-width: 720px; }
+.feedback > .icon-btn { margin: 0 0 6px -8px; }
+.feedback-start { display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; }
+.feedback-compose { display: flex; flex-direction: column; margin-top: 18px; padding: 14px; }
+.feedback-compose .micro-label { margin: 10px 0 6px; }
+.feedback-compose .micro-label:first-child { margin-top: 0; }
+.feedback-reply { padding: 0; margin-top: 22px; }
+.feedback-text { resize: vertical; min-height: 5em; line-height: 1.5; }
+.feedback-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+.feedback-waiting .section-label { margin-top: 22px; }
+.feedback-mention, .feedback-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.feedback-mention > svg { flex: none; margin-top: 2px; color: var(--color-accent); }
+.feedback-mention > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.feedback-mention strong { font-weight: 500; font-size: 14px; }
+.feedback-mention em, .feedback-mention time {
+  font-style: normal;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.feedback-mention time { flex: none; white-space: nowrap; }
+.feedback-row .resume-titles { min-width: 0; }
+.feedback-row .resume-titles strong { overflow-wrap: anywhere; }
+
+.feedback-title { overflow-wrap: anywhere; }
+.feedback-posts { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.feedback-post { padding: 12px 14px 8px; }
+.feedback-post.is-for-me { box-shadow: inset 3px 0 0 var(--color-accent), var(--shadow-sm); }
+.feedback-post-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
+.feedback-post-head strong { font-weight: 500; }
+.feedback-post-head time {
+  margin-left: auto;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.feedback-body {
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.feedback-at { color: var(--color-accent); font-weight: 500; }
+.feedback-reply-to { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0 0 -8px; font-size: 12.5px; }

@@ -1,7 +1,8 @@
 rules_version = '2';
 
 /*
- * Four places, and the split between them is the whole design.
+ * Four places for songs, and the split between them is the whole design.
+ * (Feedback, at the foot, is a fifth and sixth that touch none of them.)
  *
  * A user's songs, playlists and chords live under their own uid, so the path is the
  * owner of record — see ROADMAP.md §1. Nobody else is ever let in there, for
@@ -256,6 +257,124 @@ service cloud.firestore {
       // always sweep both documents without first asking whether it was listed.
       allow delete: if request.auth != null
                     && (resource == null || resource.data.ownerUid == request.auth.uid);
+    }
+
+    /*
+     * Feedback on the app (README, "Feedback"). Readable and writable by
+     * anyone signed in with a handle, and by nobody else: a post goes out under
+     * a name, so the name has to be theirs.
+     *
+     * A thread names its newest post (`lastPostId`), and the app writes the
+     * two in one batch. Each rule checks the other with `getAfter`, so a post
+     * cannot exist unless its thread names it, and a thread cannot name a post
+     * somebody else wrote. The limits are `src/lib/feedback.ts`'s.
+     *
+     * Nothing here can be edited or deleted from the app. Moderation, if it is
+     * ever needed, is the console for now.
+     */
+    match /feedback/{threadId} {
+      function postAfter(postId) {
+        return getAfter(/databases/$(database)/documents/feedback/$(threadId)/posts/$(postId)).data;
+      }
+
+      function validThread(t) {
+        return t.keys().hasOnly(['authorUid', 'handle', 'display', 'title', 'postCount',
+                                 'lastPostId', 'lastBy', 'createdAt', 'updatedAt'])
+          && t.title is string && t.title.size() >= 1 && t.title.size() <= 120
+          && t.postCount is int
+          && t.lastPostId is string
+          && t.lastBy is string && t.lastBy.size() <= 24
+          && t.createdAt is number && t.updatedAt is number;
+      }
+
+      // The newest post is the caller's, and `lastBy` is its name, not one made up.
+      function newestIsMine(t) {
+        let post = postAfter(t.lastPostId);
+        return post.authorUid == request.auth.uid && t.lastBy == post.display;
+      }
+
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+                    && validThread(request.resource.data)
+                    && request.resource.data.authorUid == request.auth.uid
+                    && holdsHandle(request.resource.data.handle)
+                    && request.resource.data.display is string
+                    && request.resource.data.display.size() <= 24
+                    && request.resource.data.postCount == 1
+                    && request.resource.data.createdAt == request.resource.data.updatedAt
+                    && newestIsMine(request.resource.data);
+
+      // A reply, and only that: the count up by one, a new newest post, its
+      // author's name and time. The title and who started it never change.
+      allow update: if request.auth != null
+                    && validThread(request.resource.data)
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['postCount', 'lastPostId', 'lastBy', 'updatedAt'])
+                    && request.resource.data.postCount == resource.data.postCount + 1
+                    && request.resource.data.lastPostId != resource.data.lastPostId
+                    && newestIsMine(request.resource.data);
+
+      allow delete: if false;
+
+      match /posts/{postId} {
+        allow read: if request.auth != null;
+
+        // `mentions` are uids. Five at most: each one is a notice below, and
+        // every notice costs this batch a document read in these rules.
+        allow create: if request.auth != null
+                      && request.resource.data.keys().hasOnly(['authorUid', 'handle', 'display',
+                           'body', 'mentions', 'createdAt'])
+                      && request.resource.data.authorUid == request.auth.uid
+                      && holdsHandle(request.resource.data.handle)
+                      && request.resource.data.display is string
+                      && request.resource.data.display.size() <= 24
+                      && request.resource.data.body is string
+                      && request.resource.data.body.size() >= 1
+                      && request.resource.data.body.size() <= 4000
+                      && request.resource.data.mentions is list
+                      && request.resource.data.mentions.size() <= 5
+                      && request.resource.data.createdAt is number
+                      && getAfter(/databases/$(database)/documents/feedback/$(threadId))
+                           .data.lastPostId == postId;
+
+        allow update, delete: if false;
+      }
+    }
+
+    /*
+     * Somebody @-ed you: a notice waiting until you open the thread, which
+     * deletes it. Top-level rather than under `users/{uid}`, because that
+     * subtree is written by its owner and nobody else, without exception.
+     *
+     * Only the person it is for can read it or clear it. Only the author of
+     * the post it points at can write it, only for a uid that post lists, and
+     * only under the id `{postId}_{uid}` — so a post cannot ping anyone twice,
+     * or anyone it does not @.
+     */
+    match /mentions/{mentionId} {
+      function validMention(m) {
+        let post = getAfter(/databases/$(database)/documents/feedback/$(m.threadId)/posts/$(m.postId)).data;
+        return m.keys().hasOnly(['toUid', 'fromUid', 'fromHandle', 'fromDisplay', 'threadId',
+                                 'postId', 'title', 'excerpt', 'createdAt'])
+          && m.threadId is string && m.postId is string
+          && m.toUid is string && m.toUid != request.auth.uid
+          && mentionId == m.postId + '_' + m.toUid
+          && m.fromUid == request.auth.uid
+          && post.authorUid == request.auth.uid
+          && post.handle == m.fromHandle && post.display == m.fromDisplay
+          && m.toUid in post.mentions
+          && m.title is string && m.title.size() <= 120
+          && m.excerpt is string && m.excerpt.size() <= 200
+          && m.createdAt is number;
+      }
+
+      allow get, list: if request.auth != null && resource.data.toUid == request.auth.uid;
+      allow create: if request.auth != null && validMention(request.resource.data);
+      allow update: if false;
+      // Clearing one already cleared (from another device) is not an error.
+      allow delete: if request.auth != null
+                    && (resource == null || resource.data.toUid == request.auth.uid);
     }
   }
 }

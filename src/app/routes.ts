@@ -32,6 +32,10 @@ export type Route =
   | { name: 'shared' }
   | { name: 'sharedSong'; shareId: string }
   | { name: 'signIn' }
+  /* Feedback on the app, then one thread of it. Signed-in only; see README,
+     "Feedback". */
+  | { name: 'feedback' }
+  | { name: 'feedbackThread'; threadId: string }
   /** How this player wants things drawn: hand, sideways, text size. See lib/prefs.ts. */
   | { name: 'settings' };
 
@@ -61,6 +65,10 @@ export function toHash(route: Route): string {
       return `#/shared/${route.shareId}`;
     case 'signIn':
       return '#/signin';
+    case 'feedback':
+      return '#/feedback';
+    case 'feedbackThread':
+      return `#/feedback/${route.threadId}`;
     case 'settings':
       return '#/settings';
     case 'chordEditor':
@@ -94,6 +102,9 @@ export function fromHash(hash: string): Route {
     return parts[1] ? { name: 'sharedSong', shareId: parts[1] } : { name: 'shared' };
   }
   if (parts[0] === 'signin') return { name: 'signIn' };
+  if (parts[0] === 'feedback') {
+    return parts[1] ? { name: 'feedbackThread', threadId: parts[1] } : { name: 'feedback' };
+  }
   if (parts[0] === 'settings') return { name: 'settings' };
 
   // `#/chord/new/new` was the song-less editor. A bookmark to it lands home.

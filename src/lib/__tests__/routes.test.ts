@@ -21,6 +21,8 @@ describe('hashes', () => {
       { name: 'sharedSong', shareId: 'sh1' },
       { name: 'signIn' },
       { name: 'settings' },
+      { name: 'feedback' },
+      { name: 'feedbackThread', threadId: 't1' },
       song,
       words,
       editor,

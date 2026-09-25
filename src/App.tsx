@@ -12,6 +12,8 @@ import SongScreen from './screens/SongScreen';
 import SharedLibrary from './screens/SharedLibrary';
 import SharedSongScreen from './screens/SharedSongScreen';
 import SignIn from './screens/SignIn';
+import Feedback from './screens/Feedback';
+import FeedbackThreadScreen from './screens/FeedbackThread';
 import Settings from './screens/Settings';
 import Songs from './screens/Songs';
 import Splash from './screens/Splash';
@@ -23,6 +25,8 @@ import { useRecent } from './hooks/useRecent';
 import { useAuth } from './hooks/useAuth';
 import { useSharing } from './hooks/useSharing';
 import { useSharedUpdates } from './hooks/useSharedUpdates';
+import { useMentions } from './hooks/useMentions';
+import type { FeedbackAuthor } from './types/feedback';
 import { membershipBySong } from './lib/playlists';
 import { playOrEdit } from './lib/songSummary';
 import { recentSongs } from './lib/recent';
@@ -56,6 +60,21 @@ function Router() {
      what you see. */
   const orient = useOrient();
   const { updateFor } = useSharedUpdates(songs, 'songId' in route ? route.songId : null);
+  /* Who feedback goes out under, and who has @-ed them. Only a finished
+     account: a post is signed with the handle, and the rules check it. */
+  const author = useMemo<FeedbackAuthor | null>(
+    () =>
+      auth.signedIn && auth.account?.handle
+        ? {
+            uid: auth.account.uid,
+            handle: auth.account.handle,
+            display: auth.account.display ?? auth.account.handle,
+          }
+        : null,
+    [auth.signedIn, auth.account],
+  );
+  const { mentions, seen } = useMentions(author?.uid ?? null);
+  const openFeedback = useCallback(() => go({ name: 'feedback' }), [go]);
   const [busy, setBusy] = useState<ExportJob | null>(null);
   /* The playlist entry to pick out on arrival, when the way in was a song's
      pill. Not in the route: it describes one arrival, and a hash carrying it
@@ -255,6 +274,14 @@ function Router() {
       onResume={openSong}
       onAllSongs={() => go({ name: 'songs' })}
       onFindShared={() => go({ name: 'shared' })}
+      mentions={mentions}
+      /* Straight to the thread when that is all there is; to the list,
+         where each waits by name, when there is more than one. */
+      onOpenMentions={() => {
+        const threads = new Set(mentions.map((m) => m.threadId));
+        if (threads.size === 1) go({ name: 'feedbackThread', threadId: mentions[0].threadId });
+        else go({ name: 'feedback' });
+      }}
       /* Offered to someone with no songs here, who may have plenty elsewhere. */
       onSignIn={firebaseEnabled && !auth.user ? () => go({ name: 'signIn' }) : undefined}
     />
@@ -411,10 +438,37 @@ function Router() {
             /* `replace`: Back from Songs should not land on the account again. */
             onOpenSongs={() => replace({ name: 'songs' })}
             onSettings={() => go({ name: 'settings' })}
+            onFeedback={openFeedback}
+            mentionCount={mentions.length}
             suggestFrom={auth.user?.displayName ?? auth.user?.email ?? null}
             onClaim={auth.claimHandle}
             onDone={back}
             onCancel={back}
+          />
+        );
+
+      case 'feedback':
+        return (
+          <Feedback
+            author={author}
+            mentions={mentions}
+            onOpen={(threadId) => go({ name: 'feedbackThread', threadId })}
+            onSignIn={() => go({ name: 'signIn' })}
+          />
+        );
+
+      case 'feedbackThread':
+        return (
+          <FeedbackThreadScreen
+            key={route.threadId}
+            threadId={route.threadId}
+            author={author}
+            mentions={mentions}
+            onSeen={seen}
+            onSignIn={() => go({ name: 'signIn' })}
+            /* A notice on Home can open a thread directly; Back from it
+               should still leave, not strand you with no way out. */
+            onBack={canGoBack ? back : openFeedback}
           />
         );
 
@@ -670,6 +724,7 @@ function Router() {
       recent={recentlyOpened}
       playlistCount={playlists.length}
       myChordCount={myChords.length}
+      mentionCount={mentions.length}
       currentId={store.currentId}
       onGo={onGo}
       onOpenSong={openSong}

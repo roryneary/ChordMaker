@@ -22,6 +22,8 @@ interface Props {
   recent: Song[];
   playlistCount: number;
   myChordCount: number;
+  /** Feedback posts that @ this player, not yet looked at. */
+  mentionCount: number;
   currentId: string | null;
   onGo: (route: Route) => void;
   /** Opening a song, which plays it — see `openSong` in App.tsx. */
@@ -48,8 +50,10 @@ interface Props {
  * leaves by its own Back button, a destination by the tab bar or the sidebar.
  */
 /** Screens you go *to*: the tab bar's own destinations, one playlist, and the
-    songs other people have shared. One shared song is not among them: it is
-    where a link lands, with one thing to do and a Back of its own. */
+    songs other people have shared, and the feedback. One shared song is not
+    among them: it is where a link lands, with one thing to do and a Back of its
+    own. One thread of feedback is not either: it has a reply box, and a tab
+    bar under it on a phone is a way to walk off with the reply half-written. */
 const BROWSING: ReadonlyArray<Route['name']> = [
   'landing',
   'songs',
@@ -57,6 +61,7 @@ const BROWSING: ReadonlyArray<Route['name']> = [
   'playlist',
   'shared',
   'settings',
+  'feedback',
 ];
 
 export function libraryIsStep(previous?: Route): boolean {
@@ -93,6 +98,7 @@ export default function AppShell({
   recent,
   playlistCount,
   myChordCount,
+  mentionCount,
   currentId,
   onGo,
   onOpenSong,
@@ -115,6 +121,7 @@ export default function AppShell({
           recent={recent}
           playlistCount={playlistCount}
           myChordCount={myChordCount}
+          mentionCount={mentionCount}
           currentId={currentId}
           onGo={onGo}
           onOpenSong={onOpenSong}
@@ -123,7 +130,7 @@ export default function AppShell({
       )}
       <main className="shell-main">{children}</main>
       {chrome === 'tabs' && (
-        <TabBar account={account} route={route} onGo={onGo} />
+        <TabBar account={account} route={route} onGo={onGo} mentionCount={mentionCount} />
       )}
     </div>
   );
