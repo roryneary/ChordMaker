@@ -430,13 +430,13 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
         {hasWords && (
           <button
             type="button"
-            className={`btn-ghost fs-chords-toggle${chordsShown ? '' : ' is-off'}`}
+            className="btn-ghost fs-chords-toggle"
             onClick={() => setChordsShown(!chordsShown)}
-            aria-pressed={chordsShown}
-            title={chordsShown ? 'Hide the chords' : 'Show the chords'}
           >
             <MusicNotesSimple size={15} />
-            <span>Chords</span>
+            {/* What a tap does, not a bare "Chords": a toggle only named was
+                not read as one. */}
+            <span>{chordsShown ? 'Hide chords' : 'Show chords'}</span>
           </button>
         )}
         <button

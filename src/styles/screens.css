@@ -620,8 +620,7 @@ button.capo-chip.is-unset:hover {
 }
 
 .fs-chords-toggle { flex: none; gap: 5px; padding: 6px 8px; font-size: 13px; }
-.fs-chords-toggle.is-off { color: color-mix(in srgb, var(--color-text) 50%, transparent); }
-.fs-chords-toggle.is-off span { text-decoration: line-through; }
+.fs-chords-toggle span { white-space: nowrap; }
 @media (max-width: 480px) {
   .fs-chords-toggle { padding: 6px 4px; }
   .fs-chords-toggle svg { display: none; }

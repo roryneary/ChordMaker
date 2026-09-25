@@ -427,8 +427,8 @@ Carried over from the README's "Not built" section — deliberately deferred, no
 
 ## Done
 
-- **Chords on and off in the reading view** — landed 2026-09-25. One button in Play it's top bar;
-  off, the song is words only: no strip, no chord rows, lines closed up and none dimmed, so far more
+- **Chords on and off in the reading view** — landed 2026-09-25. One button in Play it's top bar,
+  labelled Hide chords / Show chords (a bare "Chords" was not read as a switch); off, the song is words only: no strip, no chord rows, lines closed up and none dimmed, so far more
   of a song fits the screen. Chords **typed into the lyric** as their own lines are recognised
   (`src/lib/chordLines.ts`: more than one "/" on a line settles it, else every token a chord or
   filler) — drawn as chords with the chords on, left out with them off. Remembered per device, not
