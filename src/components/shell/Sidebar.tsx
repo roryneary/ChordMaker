@@ -206,7 +206,7 @@ export default function Sidebar({
           onClick={() => onGo({ name: 'feedback' })}
         >
           <ChatCircleText size={18} />
-          <span>App ideas, problems…</span>
+          <span>Feedback</span>
           {mentionCount > 0 && (
             <em className="nav-count is-alert" aria-label={`${mentionCount} waiting for you`}>
               {mentionCount}

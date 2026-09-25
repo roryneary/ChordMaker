@@ -187,11 +187,11 @@ export default function SignIn({
 
         <button type="button" className="user-chip is-action account-feedback" onClick={onFeedback}>
           <span className="user-meta">
-            <strong>App ideas, problems…</strong>
+            <strong>Feedback</strong>
             <em>
               {mentionCount > 0
                 ? `${mentionCount} waiting for you`
-                : 'Everyone signed in can read them and reply'}
+                : 'App ideas, problems…'}
             </em>
           </span>
           {mentionCount > 0 && <span className="tag tag-alert">{mentionCount}</span>}

@@ -518,9 +518,9 @@ refused.
   "Left-handed" read as a statement about you rather than a thing it did, so it is **Mirror the
   chords**, "for playing left-handed". "Chords on their side" is **Chord orientation: Upright /
   Sideways**, on Settings and on Songs. Text size shows a chorded verse of *House of the Rising
-  Sun* at the reading view's real sizes (`readingSizes`). The sidebar's Feedback reads **"App
-  ideas, problems…"**, as does its row on the phone's account screen; the screen's own heading
-  is still "Feedback".
+  Sun* at the reading view's real sizes (`readingSizes`). Feedback keeps its name; the line
+  under it — on the Feedback screen and its row on the phone's account screen — reads **"App
+  ideas, problems…"**.
   *Open:* whether "Send the chords" to the band should always go upright and right-handed, rather
   than the sender's way round. Today it follows the sender, like everything else.
 - **Arrange the chords** a song pins at the top: earlier/later arrows, and "Order as played" by
