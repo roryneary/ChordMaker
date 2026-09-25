@@ -825,8 +825,10 @@ button.capo-chip.is-unset:hover {
 
 /* Upright / Sideways. Both words at one size: `.seg`'s growing letters are
    the text-size ramp, not a thing every choice should do. */
-.seg.chord-orientation { flex: none; box-shadow: inset 0 0 0 1px var(--color-divider); }
-.seg.chord-orientation button { font-size: 13px; min-height: 32px; }
+.seg.chord-orientation,
+.seg.appearance { flex: none; box-shadow: inset 0 0 0 1px var(--color-divider); }
+.seg.chord-orientation button,
+.seg.appearance button { font-size: 13px; min-height: 32px; }
 .settings-preview figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .settings-preview figcaption { font-size: 13px; font-weight: 500; }
 .settings-signin { margin: 18px 0 0 -8px; }

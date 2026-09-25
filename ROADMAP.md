@@ -520,6 +520,9 @@ refused.
   Sideways**, on Settings and on Songs. Text size shows a chorded verse of *House of the Rising
   Sun* at the reading view's real sizes (`readingSizes`). Feedback keeps its name; its row on
   the phone's account screen reads **"App ideas, problems and conversation about them"**.
+  **Dark mode, 2026-09-25:** Settings has **Appearance: Auto / Light / Dark**. The dark theme and
+  the stored choice already existed (`useTheme`), but nothing let a player make it. It stays on
+  the device, unlike the prefs: whether you want dark depends on the room, not on who you are.
   *Open:* whether "Send the chords" to the band should always go upright and right-handed, rather
   than the sender's way round. Today it follows the sender, like everything else.
 - **Arrange the chords** a song pins at the top: earlier/later arrows, and "Order as played" by

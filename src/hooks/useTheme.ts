@@ -60,6 +60,13 @@ export function useTheme(): {
     if (choice === 'system') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', choice);
 
+    // The browser's own bar. index.html gives it one colour per OS scheme; a
+    // choice made here has to overrule both, or a dark app sits under a pale bar.
+    for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+      const scheme = meta.media.includes('dark') ? 'dark' : 'light';
+      meta.content = PALETTE[choice === 'system' ? scheme : choice].bg;
+    }
+
     try {
       window.localStorage.setItem(THEME_KEY, choice);
     } catch {

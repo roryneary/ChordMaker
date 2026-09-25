@@ -319,7 +319,13 @@ sidebar beside the account, the phone's account screen, and a button on Songs â€
 carries the Upright / Sideways choice, the one pref that changes the page you are looking at.
 Text size shows a chorded verse of *House of the Rising Sun* drawn at the reading view's own
 sizes (`readingSizes` in `lib/prefs.ts`, which full screen uses too), so a percentage is
-something you can see. Everything drawn follows
+something you can see.
+
+**Appearance** (Auto / Light / Dark) is on the same screen but is **not** a pref: it is
+`useTheme`'s choice, kept per device (`chord-builder:theme:v1`), because a phone on a dark stage
+and a laptop at a desk want different answers. Auto stamps nothing on `<html>` and lets the OS
+decide; Light or Dark stamps `data-theme`, and also overrides the browser bar's `theme-color`,
+which `index.html` otherwise sets per OS scheme. Everything drawn follows
 them, including what is printed and saved: what you send is what you see.
 
 ## Notes

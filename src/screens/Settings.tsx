@@ -1,4 +1,5 @@
 import { ArrowLeft } from '@phosphor-icons/react';
+import Appearance from '../components/Appearance';
 import ChordDiagram from '../components/ChordDiagram';
 import ChordOrientation from '../components/ChordOrientation';
 import TextSize from '../components/TextSize';
@@ -69,6 +70,15 @@ export default function Settings({ signedIn, onBack, onSignIn }: Props) {
       </p>
 
       <ul className="settings-list">
+        {/* Not synced with the others: a phone on a dark stage and a laptop at
+            a desk want different answers, so this one stays on the device. */}
+        <li className="settings-row">
+          <span>
+            <strong>Appearance</strong>
+            <em>Auto follows how this device is set. Kept on this device, not your account.</em>
+          </span>
+          <Appearance />
+        </li>
         <li className="settings-row">
           <span>
             <strong>Chord orientation</strong>
