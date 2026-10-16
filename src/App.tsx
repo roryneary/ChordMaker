@@ -358,7 +358,9 @@ function Router() {
           <Songs
             songs={songs}
             playlists={playlists}
-            onOpen={openSong}
+            onPlay={(songId) => go({ name: 'fullScreen', songId })}
+            onShare={(songId) => go({ name: 'ready', songId })}
+            onEdit={(songId) => go({ name: 'song', songId })}
             onOpenPlaylist={({ playlistId, itemId }) => {
               setArriveAt(itemId);
               go({ name: 'playlist', playlistId });
@@ -629,6 +631,7 @@ function Router() {
             onShareChords={() => shareChords(song)}
             onSaveChordsImage={() => saveChordsImage(song)}
             onCopyChords={() => copyChords(song)}
+            onCapo={(capo) => dispatch({ type: 'SET_CAPO', id: song.id, capo })}
             sharing={{ ...sharingFor(song), onSignIn: () => go({ name: 'signIn' }) }}
             onClose={back}
           />
@@ -686,6 +689,16 @@ function Router() {
               onUpdate: (noteId, text, kind) =>
                 dispatch({ type: 'UPDATE_NOTE', id: song.id, noteId, text, kind }),
               onRemove: (noteId) => dispatch({ type: 'REMOVE_NOTE', id: song.id, noteId }),
+            }}
+            onNotNeeded={(detail, notNeeded) =>
+              dispatch({ type: 'SET_NOT_NEEDED', id: song.id, detail, notNeeded })
+            }
+            videosOn={{
+              onAdd: (url, label) =>
+                dispatch({ type: 'ADD_VIDEO', id: song.id, videoId: newId(), url, label }),
+              onLabel: (videoId, label) =>
+                dispatch({ type: 'LABEL_VIDEO', id: song.id, videoId, label }),
+              onRemove: (videoId) => dispatch({ type: 'REMOVE_VIDEO', id: song.id, videoId }),
             }}
             update={updateFor(song)}
             onReplaceMine={(shared) =>

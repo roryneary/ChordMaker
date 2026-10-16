@@ -66,6 +66,7 @@ Playlists have landed (see Done). What is left, in order:
    themselves (they list in creation order); "add all from another playlist"; putting the same
    song in twice from the UI (the model allows it, the screens do not offer it).
 5. **`learningStatus` and links**, as optional fields like `artist`. Deliberately not early.
+   **YouTube links landed 2026-09-27** (`Song.videos`, see Done); `learningStatus` is still to do.
    **`writer` belongs here too** — strictly a song has one, and it is not always the artist. It
    was left out of step 1 on purpose: one line under a title has room for one name, and the name
    a song gets reached for by is the performer. Same shape as `artist` when it is wanted.
@@ -116,9 +117,6 @@ chord in a song: opening it, ticking the box and saving is that, and costs the s
 - **Clearing the retired store's orphans** at `users/{uid}/chords`. They are skipped, not
   deleted. If it is done, match exactly `keys == [id, spec]` and nothing looser — "delete what I
   cannot read" is a rule an older build would apply to a newer build's chords.
-- **A delete on one device is undone by another that still holds the chord** and has not synced
-  since — the same limit songs have, from the same merge, and not worth fixing for one and not
-  the other.
 - **A chord drawn with a string left unset is not recognised as built in.** Tap out D's three
   fingers without marking the low strings muted and it is a different shape from the library's D
   (`-.-.-.2.3.2`, not `x.x.0.2.3.2`), and can be kept beside it. That is `shapeKey` being honest —
@@ -419,13 +417,66 @@ Carried over from the README's "Not built" section — deliberately deferred, no
   how many lyric lines had a chord dropped on them, which called a finished song unfinished:
   dropping chords on words is a nice to have, and a sheet with the shapes typed into the words
   by hand is complete. Nothing on a card judges a song now — `songSubLine` says what is in it.
-  The "lines to chord" readouts on the sidebar and song screen were left alone: they count,
-  they do not grade.
+  The "lines to chord" readouts on the sidebar and song screen were left alone at first, as
+  counting rather than grading — and **removed 2026-09-27** (`unchordedLineCount` with them):
+  a count of what is left undone is a to-do list, and it only saw dropped chords, so a sheet with
+  its chords typed in read as every line, chord lines included, still to do.
 
 - **Capo changing the diagrams.** `rootFret` means an absolute neck position; making it
   capo-relative would silently reinterpret every chord already saved.
 
 ## Done
+
+- **Devices keep each other up to date while open** — landed 2026-10-16, README "Whether it is
+  really saved". Rory kept chords on his phone and his computer and they never met: each device
+  read the account once, when the app loaded, and a phone keeps the app loaded for days. Now songs,
+  playlists and My chords are *listened to* (`watchCollection`), and a change on one device lands on
+  the other within a second or two. Deletes stick too: a device the account has synced before drops
+  an entry the account no longer holds instead of sending it back up (`mergeOnSignIn`, `known`),
+  which retires the "a delete on one device is undone by another" limit. No rules change.
+  **Not checked:** anything signed in — two real devices, a delete on one, and the phone going
+  underground and coming back. Firestore bills a read per changed document per listening device;
+  the first answer on each load reads the whole library, as the fetch did.
+
+- **"This song is missing…" when a song is opened to edit** — landed 2026-09-27, README "Asking
+  what a song is missing". Asked for by Rory: a song come back to without an artist or notes says
+  so, and a tick per detail says this song does not need it. Decided with him: only on opening to
+  edit (never before playing), only artist and notes (a video was offered and left out), and the
+  tick is per song, not a setting. Ticks do not travel with a share. **`firestore.rules` changed**
+  (`notNeeded` in `validSong`) — deploy the rules before the bundle. **Checked** in headless Chrome
+  at phone width: the sheet on an older song, the artist typed in it reaching the song, a tick
+  surviving a reload, no sheet for a complete song. **Not checked:** signed in; desktop layout.
+  *Open:* there is no way to be asked again once ticked, short of filling the detail in — add one
+  if it is missed.
+
+- **YouTube links on a song, to see how it is played** — landed 2026-09-27, README "Videos". Any
+  number (up to 20), each with an optional label, pasted in any of the forms YouTube hands out and
+  stored as one; a start time is kept and shown ("from 1:30"). On the song screen under Notes, and
+  in the reading view's panel. They travel with a shared song. **`firestore.rules` changed** —
+  `videos` in `validMusic` and both field lists — so **the rules must be deployed before the
+  bundle**, or every save of a song with a video is refused. **Checked** in headless Chrome at
+  phone width on localhost: adding (including `youtu.be/…` with no scheme and a `t=1m5s`), the
+  refusal of a Vimeo link, the stored form, and the reading view's "Notes 1 · Videos 3".
+  **Not checked:** anything signed in — a video syncing, and one arriving on a shared song.
+
+- **Share song: one sheet, reached from Songs too** — landed 2026-09-27. Asked for because
+  sharing was confusing: the only way to it was to open a song to edit it, then "Send it to
+  someone". Now a tap on Songs asks **Play song / Share song / Edit song** (`SongOpenSheet`); the
+  song screen's button is **Share song** on both layouts (desktop's separate "Print for the stand"
+  went, it opened the same sheet); and the sheet puts **Share using link (for social media and
+  email)** at the top, where "Send a link to the band" was last. **Make available globally** is in
+  it, with an ⓘ that explains what it does and what turning it off does not undo; the link sheet
+  lost its own copy of the box, so there is one on the way to sharing, not three. The rule for
+  what a tick does is `globalAction`, tested. No rules change: safe to put live any time.
+  **Different from before:** the capo question moved from a check sheet on the song screen into
+  the share sheet, because Share song from Songs would otherwise skip it. The no-chords warning
+  went with it — the picture rows already say "Add a chord first".
+  **Checked 2026-09-27** in headless Chrome at 390 px and 1280 px, signed out: the sheet on
+  Songs, Play/Share/Edit landing where they should, no Play on an empty song, the capo holding
+  every row until answered, the ⓘ, the link sheet, both song screen buttons, no page errors.
+  **Not checked:** anything signed in — ticking the box for real, and the link end to end.
+  *Open:* Home and playlists still play on a tap, by choice. Whether they should ask too is Rory's
+  call once this has been used.
 
 - **Chords on and off in the reading view** — landed 2026-09-25. One button in Play it's top bar,
   labelled Hide chords / Show chords (a bare "Chords" was not read as a switch); off, the song is words only: no strip, no chord rows, lines closed up and none dimmed, so far more
@@ -450,6 +501,8 @@ words turns the page".
 - A tap on the words turns; the top quarter goes back. One column (always on a phone — Rory: no
   room for a split there) turns a screenful and marks the line you were on. Two pages where
   there is room, rolling: the page you finished turns, the one you are reading stays.
+  **Changed 2026-09-27:** rolling confused (Rory); two pages now turn like a book — right page
+  on two pages, left page back two. `spreadForward` / `spreadBack` / `clampSpread` in `lib/pages.ts`.
 - **Different from the plan agreed here:** pages are cut by measuring each line
   (`readItems` → `lib/pages.ts`), not by CSS columns — a column layout cannot repeat the line
   you were on, and the pure functions want numbers to test. And the page about to change is
@@ -462,6 +515,17 @@ words turns the page".
 - **Built beside chords on and off** (above) and fitted together after: a turn measures
   whatever is drawn, so words only turns by the closer-set lines, and the two pages are cut
   again when the chords go on or off.
+- **Landed 2026-10-16: two pages fit the song to one spread.** Rory: the page turning was poor,
+  nobody wants to turn mid-song; fit the song onto the two pages, adjusting the zoom. The text
+  shrinks to fit (never above the player's size, never below 60%), and a song too long for that
+  gets the fewest spreads it can. "Keep my text size" in the gear row turns it off. No rules
+  change. README, "Two pages fit the song to one spread". **Checked** in headless Chrome at
+  1280 × 800 and 1024 × 640, words only: 10 verses went from 10 pages to 2 at 66% (1280) and to
+  4 at 68% (1024); 30 verses stopped at the floor; a short song left at 100%; off and on again;
+  no page errors. **Not checked:** chords on with placed chords, a real tablet, a song whose
+  fonts arrive after the fit (it re-cuts at the fitted size but does not search again).
+  *Not built:* growing a short song's text to fill the spread, and fitting one column — a phone
+  has no room to shrink into.
 - **Not in this, and not agreed:** pinning the chorus on one side. The song has no named
   sections (`lyric.ts`), so it would need section markup first.
 
@@ -523,6 +587,9 @@ refused.
   **Dark mode, 2026-09-25:** Settings has **Appearance: Auto / Light / Dark**. The dark theme and
   the stored choice already existed (`useTheme`), but nothing let a player make it. It stays on
   the device, unlike the prefs: whether you want dark depends on the room, not on who you are.
+  **Behind your name, 2026-09-27:** on the desktop, pressing your name on the sidebar's account
+  chip opens Settings — it used to do nothing — and the separate Settings item is gone, since
+  more settings are coming and they are yours. Signed out there is no name, so the item stays.
   *Open:* whether "Send the chords" to the band should always go upright and right-handed, rather
   than the sender's way round. Today it follows the sender, like everything else.
 - **Arrange the chords** a song pins at the top: earlier/later arrows, and "Order as played" by

@@ -140,13 +140,19 @@ cleared the plate in place was removed because two saves on one screen confused 
 round trip cost. Back (the arrow at the top, or the button beside Save) leaves
 without saving, and asks first if the chord has changed (`chordChanged` in `lib/chordEdits.ts`).
 
-**Opening a song plays it.** From Songs, Home, a playlist or the sidebar, a song opens in the
-reading view, with **Edit** one tap on in its top bar — pushed, so Back from the song screen
+**Opening a song plays it — except on Songs, which asks.** From Home, a playlist or the sidebar,
+a song opens in the reading view, with **Edit** one tap on in its top bar — pushed, so Back from the song screen
 comes back to playing. A song is opened to play far more often than to be changed, and every
 list used to open the builder, which is the wrong screen for someone about to play. The rule is
 `playOrEdit`: a song with words or chords plays; one with nothing to read yet opens to be filled
 in. The reading view shows a song with chords and no words as a grid of big diagrams. Starting a
 song, and coming back from its editors, still go to the song screen.
+
+On **Songs**, a tap opens a sheet instead (`SongOpenSheet`): **Play song**, **Share song**, **Edit
+song**. Songs is the list you come to for a song to *do something with*, and sharing one used to
+mean opening it to edit, then finding the button there. Play is not offered for a song with
+nothing to read (`playOrEdit`). Home and playlists still play on the tap: there, playing is what
+the list is for.
 
 The reading view's text size is nine steps (`TEXT_SCALES`), from half the drawn size, which gets
 most of a song on a phone at once, and it is the player's, remembered. The gaps between lines
@@ -176,7 +182,8 @@ pref — `validPrefs` in the rules names the profile's keys exactly.
 
 **"Play it" is a named button, because full screen is the point of the app.** On a phone the
 song screen's action bar holds both ways out in words — "Play it", the wider half, and "Share
-or print" beside it. It used to hold only "Looks right", which goes to Ready, with full screen
+song" beside it (desktop has "Share song" in the header, where "Print for the stand" and "Send
+it to someone" used to be two names for one door). It used to hold only "Looks right", which goes to Ready, with full screen
 hidden behind an unlabelled expand icon halfway up the scroll: a player who opened a song to
 play it had nothing on the screen that said so. Desktop says "Play it" in the same place it
 used to say "Full screen". With no words pasted there is nothing to read full screen, so the
@@ -193,8 +200,9 @@ the diagrams are small (64 px, 88 px on desktop) on the grounds that mid-song yo
 a shape you already know. The PDF's chord reference row is the same idea on paper.
 
 **A tap on the words turns the page.** Scrolling takes a hand off the guitar for as long as it
-takes; a tap takes an instant. The top quarter of the words goes back, anywhere else goes on;
-a tap on a button, the notes or a text selection is not a turn. The decisions are pure
+takes; a tap takes an instant. In one column the top quarter of the words goes back and
+anywhere else goes on; on two pages the left page goes back and the right goes on. A tap on a
+button, the notes or a text selection is not a turn. The decisions are pure
 functions in `lib/pages.ts`, tested; the screen only measures where each line is drawn
 (`readItems`) and hands them over. Unlike the chord strip this does measure: a page is made of
 whole lines, and only the browser knows how tall a wrapped line is.
@@ -206,15 +214,30 @@ whole lines, and only the browser knows how tall a wrapped line is.
 - **Two pages** where there is room (`useTwoPagesFit`: at least 900 × 560, so a phone on its
   side stays one column), on by default and switched per device. Nothing scrolls. Both pages
   draw the whole song, slid up to their first line and clipped after their last whole one. They
-  **roll**: a tap turns the page you finished, never the one you are reading, so the tap can
-  come any time while reading it. Each says "Page 3 of 8", the left says "next" when it is
-  ahead of the right, and the page that turned flashes once. Nothing is dimmed: which of the
-  two you are reading is not something the screen can know.
+  turn **like a book**: a tap on the right page moves on two pages, a tap on the left goes back
+  two, so the spread is always two pages in order (1–2, 3–4, …). Each says "Page 3 of 8", and
+  both flash once on a turn. They used to *roll* — a tap turned only the page you had finished,
+  so the tap could come while still reading the other — but a left page that was ahead of the
+  right, and a tap that did different things depending on which page was older, confused more
+  than the early tap saved (Rory, 2026-09-27).
+- **Two pages fit the song to one spread** where they can, so most songs are not turned at
+  all: nobody wants to turn mid-song either, if the song can simply be all there. The text
+  shrinks until the song is two pages — never bigger than the player's own size, never below
+  60% of the drawn size (`FIT_FLOOR`, about 16px words on a wide screen), past which a stand is
+  too far away. A song too long even then gets the fewest spreads the floor manages, at the
+  biggest size that still makes that few. The left page says "text 66% to fit", so smaller
+  words are not taken for the size setting going wrong; **Keep my text size** in the gear row
+  turns it off, per device. Only the browser knows how a line wraps at a size, so it is a
+  search: `startFit` / `fitStep` in `lib/pages.ts` decide, the screen draws at each size they
+  ask for and counts the pages, all in layout effects before the screen paints — six or so
+  draws, none seen. A fit holds for one song drawn one way in one room, and starts again when
+  any of those change.
 - **A verse is not split across a turn** if it can help it: when a verse starts below 40% of
   the page, the turn waits for it. Tried at 60% first, and four-line verses came out cut in two
   every other page.
-- The first time on a device, the bottom bar says "Tap to turn · top to go back" where it
-  usually says the screen stays on; after one turn it is known, and goes.
+- The first time on a device, the bottom bar says how to turn ("Tap to turn · top to go back",
+  or "Tap right to turn · left to go back" on two pages) where it usually says the screen stays
+  on; after one turn it is known, and goes.
 
 **A chord can exist without a song, in My chords — and only there.** This reverses what stood
 here, "there is no such thing as a chord without a song". That was the cure for a real fault:
@@ -314,8 +337,9 @@ device's it goes up; a change is sent as it is made, and a failure is not surfac
 are not work. Only a finished account (one with a handle) syncs them: the rules will not let the
 profile be written without one.
 
-They live on a screen of their own, **Settings** (`#/settings`), reached from the foot of the
-sidebar beside the account, the phone's account screen, and a button on Songs — which also
+They live on a screen of their own, **Settings** (`#/settings`), reached by pressing your name
+on the sidebar's account chip (signed out, a Settings item at the foot of the sidebar instead),
+the phone's account screen, and a button on Songs — which also
 carries the Upright / Sideways choice, the one pref that changes the page you are looking at.
 Text size shows a chorded verse of *House of the Rising Sun* drawn at the reading view's own
 sizes (`readingSizes` in `lib/prefs.ts`, which full screen uses too), so a percentage is
@@ -354,6 +378,62 @@ mid-song. Notes travel with a shared song — most of what a bandmate needs — 
 song being thrown away, and print on the A4 sheet, where `a4SheetLayout` counts them so the
 sheet still fits one page.
 
+## Videos
+
+A song can carry **YouTube links to see how it is played** — a lesson, the band live:
+`Song.videos`, optional and absent when there are none, the `notes` shape, so no migration. Each
+is `{ id, url, label? }`. Only YouTube, on purpose: that is where the lessons are, and knowing the
+site is what gives a row its thumbnail and lets the same video pasted twice be seen as one.
+
+**What is pasted is not what is stored.** `youTubeUrl` (`lib/videos.ts`) reads every form people
+paste — youtu.be from the share button, a watch page with a playlist on it, Shorts, the phone
+site, YouTube Music, any of them without `https://` — and writes each one way, a watch page. **A
+start time is kept** (`?t=1m30s` becomes `&t=90s`, and the row says "from 1:30"), because "from
+where the solo starts" is often the point of the link. The same video from another point is a
+second link. The add box has `noValidate`: the browser's own URL check refuses `youtu.be/…` with
+no scheme, which is exactly how a link is often pasted.
+
+**A link out, not a player.** A phone hands a watch page to the YouTube app, which slows a video
+down, loops it and remembers the place; an embedded player would do none of that in a box the
+size of a chord. It opens in a new tab, so the song is still where it was. The thumbnail is
+YouTube's still (`i.ytimg.com`), and when it cannot load — offline, a video taken down — the row is
+the logo and its words.
+
+They sit under **Notes** on the song screen, because they answer the same question by showing, and
+in the reading view's panel at the top of the words, under the song-wide notes ("Notes 2 · Videos
+1"). A label is saved when its box is left, like a note. Videos travel with a shared song, count
+against a blank song being thrown away, and are not printed.
+
+Adding them needed **`firestore.rules`** as well: `validMusic` checks the count (20,
+`MAX_VIDEOS`) and both field lists gained `videos`. **Deploy the rules before the bundle that
+writes the field**, or every save of a song with a video is refused.
+
+## Asking what a song is missing
+
+Opening a song to edit asks after **who plays it** and **notes on how to play it**, if it has
+neither, in a sheet (`MissingDetailsSheet`). Each can be filled in there, or ticked **Not needed
+for this song**, and a tick ends it: that song is not asked about that detail again. The ticks are
+`Song.notNeeded`, absent when there are none; `missingDetails` and `detailsToAsk` in
+`lib/details.ts` hold the rule.
+
+- **Only on the song screen, never before playing.** Opening a song from a list plays it, often on
+  a stage, and a question there would be in the way at the worst moment.
+- **Only a song being come back to** — one made before this session began. A song made a minute
+  ago is still being written, and the sheet would be asking for what is about to be typed anyway.
+- **Once a session per song**, so leaving for the words editor and coming back does not ask again.
+- **The artist is typed in the sheet**, because it is one line and the sheet is already asking; a
+  note is a sentence written with the song in view, so **Write a note** closes the sheet and
+  scrolls to Notes.
+- Only these two, on purpose. The capo already has its own question (`CapoChip`); a video or a
+  key is too often not wanted to be worth asking about. `SONG_DETAILS` is the list to add to.
+
+**The ticks are about this copy, and do not travel** when the song is shared. That is also why
+ticking one is kept from reading as a change since sharing: `SET_NOT_NEEDED` moves `shared.at` on
+with the stamp when the song was up to date with its share, or the song screen would offer to
+share changes nobody else would ever see. A recipient's ticks survive *Replace mine*.
+`firestore.rules` gained `notNeeded` in the song's own field list (not the shared copy's), so,
+as with videos, **deploy the rules before the bundle**.
+
 ## Playlists
 
 A playlist is an ordered list of songs you already have, and **one document, items and all**:
@@ -387,18 +467,19 @@ read. The reducer refuses both; the screens say why before it comes to that. The
 the same song twice; the add screens do not offer it, because the likelier tap is a mistake, and
 show a song already in the playlist ticked and locked rather than hiding it.
 
-**Calling a song finished is a claim, so it is checked before it is accepted.** `Song.capo` has three
+**Nothing leaves until the capo has been answered.** `Song.capo` has three
 states, not two: a fret, an explicit `null` meaning "no capo", and **absent** meaning nobody
 has been asked. Defaulting to `null` made the chip read as a settled answer, so players never
 noticed the capo was theirs to set — and a capo moves every chord on the sheet. An unanswered
-capo therefore renders as a dashed "Set the capo", and the song screen will not go through to
-Ready until it has an answer, offered as chips in the check sheet (the chip's own menu is
-absolutely positioned and would be clipped by the sheet's scroll). The sheet's own confirm
-button is still "Looks right" — in there it is answering a question, not naming a destination.
+capo therefore renders as a dashed "Set the capo", and the share sheet ("Where's it going?")
+asks it at the top, as chips, with every row held until it is answered (the chip's own menu is
+absolutely positioned and would be clipped by the sheet's scroll). It used to be a check sheet
+on the song screen, in front of Ready; once Share song could be reached from a row on Songs
+too, the question moved to where both ways arrive. The question is latched when the screen
+opens, so answering it does not pull it out from under the finger that did.
 
-A song with **no chords** is warned about in that same sheet but let through: words on their
-own are a legitimate thing to print. The check is latched at the moment it opens, so answering
-the capo does not pull the question out from under the finger that answered it.
+A song with **no chords** is let through: words on their own are a legitimate thing to print,
+and the picture rows say "Add a chord first".
 
 Songs saved before the third state existed carry `capo: null` and read as already decided —
 `parseSong` keeps a stored `null` rather than collapsing it, which is the whole migration.
@@ -466,7 +547,12 @@ zooming. `chordSheetLayout` is pure and tested. Two things in it are not obvious
 The title and names are drawn with the canvas's own `fillText`. That never taints the canvas,
 webfont or not; the restriction in "Not built" below is on fonts linked from *inside* an SVG.
 
-The Ready sheet offers it three ways, and only the ways the device can honour (`src/lib/share.ts`
+**Share song** is one sheet, "Where's it going?", on the Ready screen, reached from the song
+screen and from a song's row on Songs. In order: **Share using link (for social media and
+email)** first, because it sends the whole song; **Make available globally**, with an ⓘ that
+explains it in full (`GlobalToggle`); then the picture of the chords, and Print for the stand.
+
+It offers the picture three ways, and only the ways the device can honour (`src/lib/share.ts`
 holds all the feature detection): **Send the chords** through the phone's share sheet, which is
 the short way into WhatsApp; **Save the chords as a picture**; and **Copy the chords**. Copying
 hands `ClipboardItem` the *promise* of the PNG rather than the PNG — Safari only allows a
@@ -549,13 +635,14 @@ that is already gone, so a song whose owner stopped sharing from another device 
 carries a 36-character id — so a typical one is ~25 kB and a page of thirty would be most of a
 megabyte. A song the owner chooses to show also gets a 1–2 kB card at `sharedIndex/{shareId}`,
 written in the same batch as the song so the two cannot drift; "listed" *is* the card existing.
-**The way in is a checkbox on every song's row, "Make available globally"** (`SongCard`'s
-`global`). It began as a tick-box inside the "Send a link to the band" sheet, where nobody
-wanting to publish a song would think to look. Ticking it shares a never-shared song straight
+**The way in is a checkbox, "Make available globally"**, on every song's row (`SongCard`'s
+`global`) and in the Share song sheet, with an ⓘ there (`GlobalToggle`). What a tick does is one
+pure, tested rule, `globalAction` in `lib/sharedSong.ts`. It began as a tick-box inside the "Send
+a link to the band" sheet, where nobody wanting to publish a song would think to look. Ticking it shares a never-shared song straight
 into the library, or adds one already shared by link. Unticking takes it out of the library *and
 only that* — the link may have been sent to someone, so it still opens, the row says "Shared by
-link", and stopping altogether is in the song's share sheet. The same box, by the same name, is
-in that sheet. Search is a prefix match on the title, because that is the text search Firestore does unaided.
+link", and stopping altogether is in the link sheet ("Share using link"). That sheet no longer carries
+the box itself — it is one tap back, in Share song. Search is a prefix match on the title, because that is the text search Firestore does unaided.
 Shared songs has no tab — six is what fits at 360 px — and is reached from Songs and the sidebar.
 `#/shared`, because `#/library` is the chord library.
 
@@ -637,6 +724,24 @@ resurrected. Without it, editing a song on a dead connection and reopening the a
 silently reverted the edit. The merge runs **inside the reducer** (`HYDRATE`), against the store
 as it is at that moment, so a song made while the account was still loading cannot be lost to
 the gap.
+
+**The account is listened to, not fetched once** (`lib/watchCollection.ts`). It used to be read
+when the app loaded and never again, and a phone keeps the app loaded for days — so a chord kept on
+the laptop never reached it, and nothing short of closing the app would tell it. Now every change
+to songs, playlists or My chords, from any device, comes through the same merge as a sign-in, one
+collection at a time. Two rules make that safe to do continuously:
+
+- **Only answers from the server are merged.** With no signal the SDK answers from its cache, which
+  can be empty, and the next rule would read that as "everything was deleted". Cached answers are
+  skipped (`snap.metadata.fromCache`).
+- **A device the account already knows drops what the account no longer holds**, unless it is on
+  the unconfirmed list (`mergeOnSignIn`, `known`). Everything else held here was confirmed once, so
+  its absence means it was deleted on another device. Without this, a device that missed the delete
+  sent it straight back up. A *first* sign-in on a device is not known, and pushes everything, as
+  the migration needs.
+
+An update that changes nothing — usually the echo of this device's own write — hands back the same
+store (`sameValue`), so typing does not re-render the library once per keystroke.
 
 **A different account signing in on the same device** replaces the library here with its own —
 it has to, the songs are not theirs to see. That used to simply overwrite it, so signing in with

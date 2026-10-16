@@ -2,6 +2,7 @@ import type { CopiedFrom, Song } from '../types/song';
 import type { SharePayload, SharedCard, SharedSong } from '../types/sharedSong';
 import { parseSong } from './storage';
 import { MAX_NOTES, MAX_NOTE_CHARS } from './notes';
+import { MAX_VIDEOS, MAX_VIDEO_LABEL_CHARS, MAX_VIDEO_URL_CHARS } from './videos';
 
 /**
  * Sharing, the part with no server in it: what travels, what a recipient's copy
@@ -32,7 +33,7 @@ export const MAX_CHORDS = 100;
 
 /** Why the account would refuse this song, in words for the player; null if it would not. */
 export function tooBigToSave(
-  song: Pick<Song, 'title' | 'artist' | 'lyric' | 'words' | 'chords' | 'notes'>,
+  song: Pick<Song, 'title' | 'artist' | 'lyric' | 'words' | 'chords' | 'notes' | 'videos'>,
 ): string | null {
   if (song.lyric.length > MAX_LYRIC_CHARS || song.words.length > MAX_WORDS) {
     return 'These words are too long to save to your account. Split the song in two.';
@@ -43,6 +44,11 @@ export function tooBigToSave(
   const notes = song.notes ?? [];
   if (notes.length > MAX_NOTES) return 'That is more notes than one song can hold.';
   if (notes.some((n) => n.text.length > MAX_NOTE_CHARS)) return 'One of the notes is too long to save.';
+  const videos = song.videos ?? [];
+  if (videos.length > MAX_VIDEOS) return 'That is more videos than one song can hold.';
+  if (videos.some((v) => v.url.length > MAX_VIDEO_URL_CHARS || (v.label?.length ?? 0) > MAX_VIDEO_LABEL_CHARS)) {
+    return 'One of the videos is too long to save.';
+  }
   return null;
 }
 
@@ -65,6 +71,8 @@ export function toSharePayload(song: Song): SharePayload {
     placements: song.placements,
     // How to play it travels with it: that is most of what a bandmate needs.
     ...(song.notes?.length ? { notes: song.notes } : {}),
+    // So do the videos of it being played, for the same reason.
+    ...(song.videos?.length ? { videos: song.videos } : {}),
   };
 }
 
@@ -190,6 +198,41 @@ export function copyOf(songs: Song[], shareId: string): Song | null {
 }
 
 /* --- The owner's side ------------------------------------------------------ */
+
+/** Why sharing is not on offer, when it is not. */
+export type SharingBlocked = 'signedOut' | 'noDatabase' | 'noCrypto' | null;
+
+/**
+ * Whether "Make available globally" is drawn at all. Signed out it is, and
+ * leads to sign-in: a shared song carries a name, and hiding the box would
+ * hide that sharing exists. With no database, or no way to make a safe link,
+ * there is nothing it could do.
+ */
+export function globalOffered(blocked: SharingBlocked): boolean {
+  return blocked !== 'noDatabase' && blocked !== 'noCrypto';
+}
+
+export type GlobalAction = 'signIn' | 'share' | 'list' | 'unlist';
+
+/**
+ * What ticking (`next`) or unticking "Make available globally" does. Ticking
+ * shares a never-shared song straight into Shared songs, or adds one already
+ * shared by link. Unticking takes it out of Shared songs *and only that*: the
+ * link may have been sent to someone, so it still opens. Null is nothing to do.
+ */
+export function globalAction(
+  song: Pick<Song, 'shared'>,
+  blocked: SharingBlocked,
+  next: boolean,
+): GlobalAction | null {
+  if (!globalOffered(blocked)) return null;
+  if (blocked === 'signedOut') return 'signIn';
+  if (song.shared) {
+    if (song.shared.listed === next) return null;
+    return next ? 'list' : 'unlist';
+  }
+  return next ? 'share' : null;
+}
 
 /** "You've changed this since you shared it." See `SharedRef.at`. */
 export function changedSinceShared(song: Song): boolean {

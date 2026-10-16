@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   type PageItem,
-  clampPair,
+  type FitSearch,
+  clampSpread,
+  fitStep,
   pageEnd,
   paginate,
-  rollBack,
-  rollForward,
+  spreadBack,
+  spreadForward,
+  startFit,
   turnBack,
   turnForward,
 } from '../pages';
@@ -76,22 +79,74 @@ describe('turning a scrolled column', () => {
   });
 });
 
-describe('rolling two pages', () => {
-  it('turns the page you finished, never the one you are reading', () => {
-    expect(rollForward([0, 1], 5)).toEqual([2, 1]);
-    expect(rollForward([2, 1], 5)).toEqual([2, 3]);
-    expect(rollForward([2, 3], 4)).toEqual([2, 3]);
+describe('two pages, turned as a spread', () => {
+  it('moves on two pages at a time, and stops at the last spread', () => {
+    expect(spreadForward(0, 5)).toBe(2);
+    expect(spreadForward(2, 5)).toBe(4);
+    expect(spreadForward(4, 5)).toBe(4);
+    expect(spreadForward(2, 4)).toBe(2);
+    expect(spreadForward(0, 1)).toBe(0);
   });
 
-  it('turns back the same way', () => {
-    expect(rollBack([2, 3])).toEqual([2, 1]);
-    expect(rollBack([2, 1])).toEqual([0, 1]);
-    expect(rollBack([0, 1])).toEqual([0, 1]);
+  it('goes back two pages at a time, and stops at the first', () => {
+    expect(spreadBack(4)).toBe(2);
+    expect(spreadBack(2)).toBe(0);
+    expect(spreadBack(0)).toBe(0);
   });
 
-  it('keeps the lower page in view when the pages are cut again', () => {
-    expect(clampPair([2, 1], 5)).toEqual([2, 1]);
-    expect(clampPair([4, 5], 3)).toEqual([2, 3]);
-    expect(clampPair([0, 1], 1)).toEqual([0, 1]);
+  it('keeps a valid spread when the pages are cut again', () => {
+    expect(clampSpread(2, 5)).toBe(2);
+    expect(clampSpread(4, 3)).toBe(2);
+    expect(clampSpread(4, 4)).toBe(2);
+    expect(clampSpread(3, 8)).toBe(2);
+    expect(clampSpread(0, 1)).toBe(0);
+  });
+});
+
+describe('fitting a song to two pages', () => {
+  /** Steps the search as the screen does, with `pagesAt` standing in for the browser. */
+  function fit(scale: number, floor: number, pagesAt: (s: number) => number) {
+    let search: FitSearch = startFit(scale, floor);
+    const drawn = [search.at];
+    while (!search.done) {
+      search = fitStep(search, pagesAt(search.at));
+      drawn.push(search.at);
+    }
+    return { at: search.at, drawn };
+  }
+  /** A song `size` pages long at full size: pages shrink with the text. */
+  const song = (size: number) => (s: number) => Math.ceil(size * s - 1e-9);
+
+  it('leaves a song that already fits alone, drawn once', () => {
+    expect(fit(1, 0.6, song(1.8))).toEqual({ at: 1, drawn: [1, 1] });
+  });
+
+  it('shrinks a longer song to the biggest size that makes two pages', () => {
+    const { at } = fit(1, 0.6, song(2.6));
+    expect(song(2.6)(at)).toBeLessThanOrEqual(2);
+    expect(at).toBeGreaterThan(2 / 2.6 - 0.03);
+    expect(at).toBeLessThanOrEqual(1);
+  });
+
+  it('stops at the floor and settles for the fewest spreads', () => {
+    // Seven pages at full size is five at the floor: three spreads would do at 0.6,
+    // but two spreads (four pages) are not reachable, so it keeps as big as six pages allow.
+    const { at } = fit(1, 0.6, song(7));
+    expect(song(7)(at)).toBeLessThanOrEqual(6);
+    expect(at).toBeGreaterThan(6 / 7 - 0.03);
+  });
+
+  it("keeps the player's size when shrinking would not save a spread", () => {
+    // Four pages at full size, three at the floor: two spreads either way.
+    expect(fit(1, 0.6, song(4)).at).toBe(1);
+  });
+
+  it("never grows past the player's size or shrinks a size already under the floor", () => {
+    expect(fit(0.5, 0.6, song(9)).at).toBe(0.5);
+    expect(fit(1.25, 0.6, song(0.5)).at).toBe(1.25);
+  });
+
+  it('finds the size in a handful of draws', () => {
+    expect(fit(1.4, 0.6, song(3)).drawn.length).toBeLessThanOrEqual(10);
   });
 });

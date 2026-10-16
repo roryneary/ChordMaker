@@ -4,8 +4,9 @@ import ChordOrientation from '../components/ChordOrientation';
 import SongCard from '../components/SongCard';
 import AddToPlaylistSheet from '../components/AddToPlaylistSheet';
 import DeleteSongSheet from '../components/DeleteSongSheet';
+import SongOpenSheet from '../components/SongOpenSheet';
 import { type Membership, membershipBySong } from '../lib/playlists';
-import type { SharingBlocked } from '../components/ShareLinkSheet';
+import { type SharingBlocked, globalAction, globalOffered } from '../lib/sharedSong';
 import type { Playlist } from '../types/playlist';
 import type { SharedSong } from '../types/sharedSong';
 import type { Song } from '../types/song';
@@ -13,7 +14,10 @@ import type { Song } from '../types/song';
 interface Props {
   songs: Song[];
   playlists: Playlist[];
-  onOpen: (songId: string) => void;
+  /* A tap on a song asks which of these three (`SongOpenSheet`). */
+  onPlay: (songId: string) => void;
+  onShare: (songId: string) => void;
+  onEdit: (songId: string) => void;
   onOpenPlaylist: (membership: Membership) => void;
   onAddToPlaylist: (playlistId: string, songId: string) => void;
   onCreatePlaylist: (name: string, songId: string) => void;
@@ -47,6 +51,9 @@ interface Props {
  * it is. The sidebar shows the last four songs and the tab bar shows none, so
  * this is the only way to reach an older song on a phone at all.
  *
+ * Tapping a song asks what it is for: play it, share it or edit it. Elsewhere
+ * a tap plays; here, the list you come to for a song to do something with.
+ *
  * Each row says which playlists the song is in. Tapping one goes to that
  * playlist with the song picked out, which is what ties the two screens
  * together — from here you can see what is in a set, and what is in none.
@@ -54,7 +61,9 @@ interface Props {
 export default function Songs({
   songs,
   playlists,
-  onOpen,
+  onPlay,
+  onShare,
+  onEdit,
   onOpenPlaylist,
   onAddToPlaylist,
   onCreatePlaylist,
@@ -69,6 +78,8 @@ export default function Songs({
   const memberships = useMemo(() => membershipBySong(playlists), [playlists]);
   const [addingId, setAddingId] = useState<string | null>(null);
   const adding = songs.find((s) => s.id === addingId) ?? null;
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const opening = songs.find((s) => s.id === openingId) ?? null;
   /* Held by id, and looked up each render: when the delete lands the song is
      no longer in `songs`, `deleting` is null, and the sheet closes itself. A
      shared song's delete waits on the database, so it cannot simply close on
@@ -77,29 +88,24 @@ export default function Songs({
   const deleting = songs.find((s) => s.id === deletingId) ?? null;
 
   /**
-   * The box on each row. Ticking it is the whole of "share this with everyone":
-   * a song that has never been shared is shared, straight into Shared songs;
-   * one already shared by link is added to it. Unticking takes it back out —
-   * and only that. The link, if there is one, still opens, because it may have
-   * been sent to someone; the row says "Shared by link", and stopping altogether
-   * is in the song's own share sheet.
-   *
-   * Signed out, the box is still there and leads to sign-in: a shared song
-   * carries a name, and hiding the box would hide that sharing exists at all.
-   * With no database, or no way to make a safe link, there is nothing it could
-   * do, so it is not drawn.
+   * The box on each row, and the same box in the song's share sheet. What a
+   * tick does is `globalAction`: shares a never-shared song straight into
+   * Shared songs, lists one shared by link, and unticked takes it out of Shared
+   * songs and only that — a link sent to someone still opens, and the row goes
+   * on saying "Shared by link".
    */
   const globalFor = (song: Song) => {
     const sharing = sharingFor(song);
-    if (sharing.blocked === 'noDatabase' || sharing.blocked === 'noCrypto') return undefined;
+    if (!globalOffered(sharing.blocked)) return undefined;
     return {
       checked: song.shared?.listed === true,
       busy: sharing.busy,
       error: sharing.error,
       onChange: (next: boolean) => {
-        if (sharing.blocked === 'signedOut') onSignIn();
-        else if (song.shared) sharing.onSetListed(next);
-        else if (next) sharing.onShare(true);
+        const action = globalAction(song, sharing.blocked, next);
+        if (action === 'signIn') onSignIn();
+        else if (action === 'share') sharing.onShare(true);
+        else if (action) sharing.onSetListed(next);
       },
     };
   };
@@ -168,7 +174,7 @@ export default function Songs({
             <li key={song.id}>
               <SongCard
                 song={song}
-                onOpen={onOpen}
+                onOpen={setOpeningId}
                 memberships={memberships.get(song.id)}
                 onOpenPlaylist={onOpenPlaylist}
                 onAddToPlaylist={setAddingId}
@@ -179,6 +185,16 @@ export default function Songs({
             </li>
           ))}
         </ul>
+      )}
+
+      {opening && (
+        <SongOpenSheet
+          song={opening}
+          onPlay={() => onPlay(opening.id)}
+          onShare={() => onShare(opening.id)}
+          onEdit={() => onEdit(opening.id)}
+          onClose={() => setOpeningId(null)}
+        />
       )}
 
       {deleting && (

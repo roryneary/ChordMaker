@@ -1,7 +1,8 @@
-import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import type { Playlist } from '../types/playlist';
 import { getFirebaseDb } from './firebase';
 import { parsePlaylist } from './playlists';
+import { watchCollection } from './watchCollection';
 
 /**
  * The remote half of a playlist: one document at
@@ -29,12 +30,11 @@ export async function deleteRemotePlaylist(uid: string, id: string): Promise<voi
   await deleteDoc(doc(playlistsRef(uid), id));
 }
 
-export async function fetchRemotePlaylists(uid: string): Promise<Playlist[]> {
-  const snap = await getDocs(playlistsRef(uid));
-  const playlists: Playlist[] = [];
-  for (const d of snap.docs) {
-    const playlist = parsePlaylist({ ...d.data(), id: d.id });
-    if (playlist) playlists.push(playlist);
-  }
-  return playlists;
+/** Every playlist the account holds, now and whenever that changes. See `watchCollection`. */
+export function watchRemotePlaylists(
+  uid: string,
+  onList: (playlists: Playlist[]) => void,
+  onError: (err: unknown) => void,
+): () => void {
+  return watchCollection(playlistsRef(uid), parsePlaylist, onList, onError);
 }

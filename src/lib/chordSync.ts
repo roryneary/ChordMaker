@@ -1,8 +1,9 @@
-import { type DocumentData, collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
+import { type DocumentData, collection, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import type { MyChord } from '../types/myChord';
 import { getFirebaseDb } from './firebase';
 import { withoutUndefined } from './firestoreData';
 import { parseMyChord } from './storage';
+import { watchCollection } from './watchCollection';
 
 /**
  * The remote half of My chords: one document per kept chord at
@@ -35,12 +36,11 @@ export async function deleteRemoteMyChord(uid: string, id: string): Promise<void
   await deleteDoc(doc(chordsRef(uid), id));
 }
 
-export async function fetchRemoteMyChords(uid: string): Promise<MyChord[]> {
-  const snap = await getDocs(chordsRef(uid));
-  const chords: MyChord[] = [];
-  for (const d of snap.docs) {
-    const chord = parseMyChord({ ...d.data(), id: d.id });
-    if (chord) chords.push(chord);
-  }
-  return chords;
+/** Every kept chord the account holds, now and whenever that changes. See `watchCollection`. */
+export function watchRemoteMyChords(
+  uid: string,
+  onList: (chords: MyChord[]) => void,
+  onError: (err: unknown) => void,
+): () => void {
+  return watchCollection(chordsRef(uid), parseMyChord, onList, onError);
 }

@@ -11,8 +11,11 @@ import { senderLabel } from './sharedSong';
  * apart, and it is what somebody scanning for a song actually remembers; the
  * counts behind it are detail. A song with nobody named simply starts at the
  * count, as every song did before the field existed.
+ *
+ * `from: false` leaves out whose it was, for the song card, which says that
+ * in a tag by the name instead (`songFromTag`).
  */
-export function songSubLine(song: Song): string {
+export function songSubLine(song: Song, { from = true }: { from?: boolean } = {}): string {
   const bits: string[] = [];
   const artist = song.artist?.trim();
   if (artist) bits.push(artist);
@@ -20,8 +23,18 @@ export function songSubLine(song: Song): string {
   if (n) bits.push(`${n} chord${n === 1 ? '' : 's'} in`);
   if (song.capo) bits.push(`capo on the ${ordinal(song.capo)}`);
   // Whose it was, last: it is the player's song now, and that is a footnote.
-  if (song.copiedFrom) bits.push(`from ${senderLabel(song.copiedFrom)}`);
+  if (from && song.copiedFrom) bits.push(`from ${senderLabel(song.copiedFrom)}`);
   return bits.join(' · ') || 'Nothing in it yet';
+}
+
+/**
+ * "From @rory" — the tag on the Songs list for a song kept from someone
+ * else. In the list, who sent it is what somebody looking at it wants to know,
+ * so it sits by the name rather than at the tail of the line, where a narrow
+ * screen cuts it off. Null for a song of the player's own.
+ */
+export function songFromTag(song: Song): string | null {
+  return song.copiedFrom ? `From ${senderLabel(song.copiedFrom)}` : null;
 }
 
 /**
@@ -37,7 +50,8 @@ export function isBlankSong(song: Song): boolean {
     !song.artist?.trim() &&
     !song.lyric.trim() &&
     song.chords.length === 0 &&
-    !song.notes?.length
+    !song.notes?.length &&
+    !song.videos?.length
   );
 }
 

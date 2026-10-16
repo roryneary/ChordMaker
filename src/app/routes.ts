@@ -28,7 +28,7 @@ export type Route =
   | { name: 'playlist'; playlistId: string }
   | { name: 'playlistAdd'; playlistId: string }
   /* Songs other people have shared, then one of them — which is also where a
-     link sent to the band lands. Not under `library`: that is the chord library. */
+     share link lands. Not under `library`: that is the chord library. */
   | { name: 'shared' }
   | { name: 'sharedSong'; shareId: string }
   | { name: 'signIn' }

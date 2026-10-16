@@ -73,9 +73,9 @@ describe('hashes', () => {
   });
 
   /* `#/library` was taken — it is the chord library — so songs other people
-     have shared live under `#/shared`, and a link sent to the band is
+     have shared live under `#/shared`, and a share link is
      `#/shared/{id}`. Those links are out in the world: this shape cannot change. */
-  it('reads a link sent to the band as the shared song it names', () => {
+  it('reads a share link as the shared song it names', () => {
     expect(fromHash('#/shared/7f3e-uuid')).toEqual({ name: 'sharedSong', shareId: '7f3e-uuid' });
     expect(fromHash('#/shared')).toEqual({ name: 'shared' });
     expect(fromHash('#/library')).toEqual({ name: 'library' });

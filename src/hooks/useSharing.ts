@@ -1,5 +1,5 @@
 import { type Dispatch, useCallback, useMemo, useState } from 'react';
-import type { SharingBlocked } from '../components/ShareLinkSheet';
+import type { SharingBlocked } from '../lib/sharedSong';
 import { firebaseEnabled } from '../lib/firebase';
 import { newShareId, tooBigToSave } from '../lib/sharedSong';
 import {

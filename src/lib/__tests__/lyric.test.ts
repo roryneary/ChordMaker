@@ -8,7 +8,6 @@ import {
   removeBlankLines,
   retokenise,
   tokenise,
-  unchordedLineCount,
 } from '../lyric';
 import type { Placements } from '../../types/song';
 
@@ -173,16 +172,5 @@ describe('retokenise', () => {
     const after = retokenise(before, 'wholly different words replace everything');
     const olds = new Set(before.map((w) => w.id));
     expect(after.every((w) => !olds.has(w.id))).toBe(true);
-  });
-});
-
-describe('unchordedLineCount', () => {
-  it('counts lines with no chord, ignoring blank ones', () => {
-    const words = tokenise(LYRIC);
-    const lines = lineCount(LYRIC);
-    expect(unchordedLineCount(words, {}, lines)).toBe(2);
-
-    const first = words.find((w) => w.text === 'harbour')!;
-    expect(unchordedLineCount(words, { [first.id]: 'chord-g' }, lines)).toBe(1);
   });
 });

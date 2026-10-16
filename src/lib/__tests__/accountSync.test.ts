@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeOnSignIn, mergeStash } from '../accountSync';
+import { mergeOnSignIn, mergeStash, sameValue } from '../accountSync';
 import { newSong } from '../storage';
 
 /**
@@ -115,6 +115,50 @@ describe('unconfirmed local changes', () => {
     expect(merged).toEqual([]);
     expect(toPush).toEqual([]);
     expect(toDelete).toEqual([]);
+  });
+});
+
+describe('a device this account has synced before', () => {
+  it('drops what the account no longer holds: it was deleted on another device', () => {
+    const gone = newSong('Deleted on the phone');
+    const still = newSong('Still here');
+    const { merged, toPush } = mergeOnSignIn([gone, still], [still], true, [], true);
+    expect(merged.map((s) => s.id)).toEqual([still.id]);
+    expect(toPush).toEqual([]);
+  });
+
+  it('keeps and sends what was made here and not yet confirmed', () => {
+    const fresh = newSong('Made with no signal');
+    const { merged, toPush } = mergeOnSignIn([fresh], [], true, [fresh.id], true);
+    expect(merged).toEqual([fresh]);
+    expect(toPush).toEqual([fresh]);
+  });
+
+  it('on a first sign-in, the same entry is local work and goes up', () => {
+    const mine = newSong('Never sent');
+    const { merged, toPush } = mergeOnSignIn([mine], [], true, [], false);
+    expect(merged).toEqual([mine]);
+    expect(toPush).toEqual([mine]);
+  });
+
+  it('keeps the local object when the account holds an identical copy', () => {
+    const song = newSong('Same');
+    const echo = { ...song };
+    const { merged } = mergeOnSignIn([song], [echo], true, [], true);
+    expect(merged[0]).toBe(song);
+  });
+});
+
+describe('sameValue', () => {
+  it('ignores key order and keys left undefined', () => {
+    expect(sameValue({ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 })).toBe(true);
+    expect(sameValue({ a: 1, capo: undefined }, { a: 1 })).toBe(true);
+  });
+
+  it('tells different data apart', () => {
+    expect(sameValue({ a: 1 }, { a: 2 })).toBe(false);
+    expect(sameValue([1, 2], [2, 1])).toBe(false);
+    expect(sameValue({ a: [] }, { a: {} })).toBe(false);
   });
 });
 

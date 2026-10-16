@@ -6,6 +6,8 @@ import { newId } from './id';
 import { clampRootFret } from './layout';
 import { parsePlaylist } from './playlists';
 import { parseNotes } from './notes';
+import { parseVideos } from './videos';
+import { parseNotNeeded } from './details';
 
 /**
  * The song store: many songs keyed by id, plus a pointer at the open one.
@@ -230,6 +232,8 @@ export function parseSong(x: unknown): Song | null {
   const shared = parseSharedRef(raw.shared);
   const copiedFrom = parseCopiedFrom(raw.copiedFrom);
   const notes = parseNotes(raw.notes);
+  const videos = parseVideos(raw.videos);
+  const notNeeded = parseNotNeeded(raw.notNeeded);
   return {
     id: raw.id,
     title: str(raw.title),
@@ -247,6 +251,8 @@ export function parseSong(x: unknown): Song | null {
     placements: parsePlacements(raw.placements),
     // Absent when there are none: an empty list is never stored.
     ...(notes.length ? { notes } : {}),
+    ...(videos.length ? { videos } : {}),
+    ...(notNeeded.length ? { notNeeded } : {}),
     // Left off entirely when absent, like `capo`: absent is the state.
     ...(shared ? { shared } : {}),
     ...(copiedFrom ? { copiedFrom } : {}),

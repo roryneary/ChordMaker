@@ -110,33 +110,84 @@ export function turnBack(items: PageItem[], viewTop: number, viewHeight: number)
   return s;
 }
 
-/** Two pages showing, as `[left, right]` page numbers. */
-export type PagePair = [number, number];
-
 /**
- * Rolling pages: the page you have finished — the lower of the two — is the
- * one that turns, to the page after the higher. The page being read never
- * moves, so the tap can come any time while reading it. Unchanged at the end.
+ * Two pages side by side, read like a book: the spread is named by its left
+ * page, always even, and the right page is the one after it. A turn moves the
+ * whole spread, two pages at a time — so what the player sees next is always
+ * the next two pages in order, never one old and one new.
  */
-export function rollForward([left, right]: PagePair, pageCount: number): PagePair {
-  const next = Math.max(left, right) + 1;
-  if (next >= pageCount) return [left, right];
-  return left < right ? [next, right] : [left, next];
+export function spreadForward(left: number, pageCount: number): number {
+  const next = left + 2;
+  return next < pageCount ? next : left;
 }
 
-/** Back one: the higher page turns back to the one before the lower. */
-export function rollBack([left, right]: PagePair): PagePair {
-  const prev = Math.min(left, right) - 1;
-  if (prev < 0) return [left, right];
-  return left > right ? [prev, right] : [left, prev];
+/** Back a spread; unchanged at the start. */
+export function spreadBack(left: number): number {
+  return left >= 2 ? left - 2 : left;
 }
 
 /**
- * The pair still valid after the pages were cut again (a new text size, a
- * resized window): the lower page is kept in view, the next beside it.
+ * The spread still valid after the pages were cut again (a new text size, a
+ * resized window): the one holding the same left page if it still exists,
+ * otherwise the last spread.
  */
-export function clampPair([left, right]: PagePair, pageCount: number): PagePair {
-  const low = Math.max(0, Math.min(Math.min(left, right), pageCount - 1));
-  if (Math.max(left, right) < pageCount && Math.abs(left - right) === 1) return [left, right];
-  return [low, low + 1];
+export function clampSpread(left: number, pageCount: number): number {
+  const last = Math.max(0, pageCount - 1);
+  const page = Math.max(0, Math.min(left, last));
+  return page - (page % 2);
+}
+
+/**
+ * Two pages, fitted: the text size that puts the whole song on one spread, so
+ * nothing is turned mid-song at all. Shrinks only — the player's own size is
+ * the most it will be — and never below `floor`, past which a stand is too far
+ * away to read. A song too long even then gets the fewest spreads it can, at
+ * the biggest size that still makes that few.
+ *
+ * Only the browser knows how tall a wrapped line is at a size, so this is a
+ * search the screen steps: draw at `at`, count the pages, hand the count to
+ * `fitStep`, draw at the next `at`, until `done`.
+ */
+export interface FitSearch {
+  /** The size to draw at now. */
+  at: number;
+  /** Known to fit the target (or the floor, before anything is known). */
+  lo: number;
+  /** Known not to fit. */
+  hi: number;
+  /** Pages at the player's own size, once counted. */
+  topPages: number | null;
+  /** Pages allowed: two, or the fewest whole spreads the floor manages. */
+  target: number | null;
+  done: boolean;
+}
+
+/** Close enough: a step smaller than this is not one anyone can see. */
+const FIT_PRECISION = 0.02;
+
+/** Start at the player's own size; most songs fit there and the search ends at once. */
+export function startFit(scale: number, floor: number): FitSearch {
+  return { at: scale, lo: Math.min(floor, scale), hi: scale, topPages: null, target: null, done: false };
+}
+
+/** One step: `pages` is how many pages the song came to at `fit.at`. */
+export function fitStep(fit: FitSearch, pages: number): FitSearch {
+  if (fit.done) return fit;
+  if (fit.topPages === null) {
+    // At the player's size: fits, or cannot shrink, and it is settled.
+    if (pages <= 2 || fit.at <= fit.lo) return { ...fit, topPages: pages, done: true };
+    return { ...fit, topPages: pages, at: fit.lo };
+  }
+  if (fit.target === null) {
+    // At the floor: as few spreads as it is ever going to be.
+    const target = Math.max(2, Math.ceil(pages / 2) * 2);
+    if (fit.topPages <= target) return { ...fit, target, at: fit.hi, done: true };
+    return next({ ...fit, target });
+  }
+  return next(pages <= fit.target ? { ...fit, lo: fit.at } : { ...fit, hi: fit.at });
+}
+
+function next(fit: FitSearch): FitSearch {
+  if (fit.hi - fit.lo <= FIT_PRECISION) return { ...fit, at: fit.lo, done: true };
+  return { ...fit, at: Math.round(((fit.lo + fit.hi) / 2) * 1000) / 1000 };
 }

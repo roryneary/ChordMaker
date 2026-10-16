@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isBlankSong, playOrEdit, songSubLine } from '../songSummary';
+import { isBlankSong, playOrEdit, songFromTag, songSubLine } from '../songSummary';
 import { newSong } from '../storage';
 import { tokenise } from '../lyric';
 import { emptySpec } from '../../hooks/useChordSpec';
@@ -33,6 +33,24 @@ describe("the line under a song's name", () => {
     expect(songSubLine({ ...newSong('Angel'), artist: '  ', chords: [chord('E')] })).toBe(
       '1 chord in',
     );
+  });
+
+  it('ends with whose it was, unless the card is saying that in a tag', () => {
+    const song = { ...newSong('Angel'), artist: 'Jimi Hendrix', copiedFrom: from };
+    expect(songSubLine(song)).toBe('Jimi Hendrix · from @Rory');
+    expect(songSubLine(song, { from: false })).toBe('Jimi Hendrix');
+  });
+});
+
+const from = { shareId: 's1', version: 1, uid: 'u1', handle: 'rory', display: 'Rory' };
+
+describe('the tag saying who a song came from', () => {
+  it('names the sender as they typed their name', () => {
+    expect(songFromTag({ ...newSong('Angel'), copiedFrom: from })).toBe('From @Rory');
+  });
+
+  it('is absent on a song of your own', () => {
+    expect(songFromTag(newSong('Angel'))).toBeNull();
   });
 });
 

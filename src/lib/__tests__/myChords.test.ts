@@ -294,6 +294,44 @@ describe('my chords in the reducer', () => {
   });
 });
 
+describe('my chords kept up to date while the app is open', () => {
+  it('drops a chord deleted on another device, rather than sending it back', () => {
+    const store = setUp();
+    const after = songsReducer(store, {
+      type: 'HYDRATE',
+      allowPush: true,
+      known: true,
+      remoteChords: store.chords.filter((c) => c.id !== 'a'),
+    });
+    expect(after.chords.map((c) => c.id)).toEqual(['b']);
+    expect(after.unsyncedChords).toEqual([]);
+  });
+
+  it('leaves the songs alone when only the chords changed', () => {
+    const store = setUp();
+    const after = songsReducer(store, {
+      type: 'HYDRATE',
+      allowPush: true,
+      known: true,
+      remoteChords: [...store.chords, kept(shapeToSpec('Elsewhere', 'xx5787'), 'c', 99)],
+    });
+    expect(after.chords.map((c) => c.id)).toContain('c');
+    expect(after.songs).toBe(store.songs);
+  });
+
+  it('hands back the same store when nothing changed', () => {
+    const store = setUp();
+    const echo = store.chords.map((c) => ({ ...c }));
+    const after = songsReducer(store, {
+      type: 'HYDRATE',
+      allowPush: true,
+      known: true,
+      remoteChords: echo,
+    });
+    expect(after).toBe(store);
+  });
+});
+
 describe('my chords across a sign-in', () => {
   it('leaves my chords alone when the account sent none to merge', () => {
     const store = { ...setUp(), unsyncedChords: ['a'] };

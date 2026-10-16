@@ -222,7 +222,7 @@ export default function SignIn({
         </div>
         <h1 className="display-sm">What should we call you?</h1>
         <p className="signin-sub">
-          This is the name on songs you share. Your band will see it — your email
+          This is the name on songs you share. Anyone you share with will see it — your email
           address stays private.
         </p>
 

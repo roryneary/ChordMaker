@@ -3,6 +3,8 @@ import {
   MAX_LYRIC_CHARS,
   changedSinceShared,
   copyOf,
+  globalAction,
+  globalOffered,
   parseSharedCard,
   parseSharedSong,
   senderLabel,
@@ -286,6 +288,35 @@ describe('the owner, after sharing', () => {
     store = songsReducer(store, { type: 'SONG_UNSHARED', id: 's1' });
     expect('shared' in store.songs[0]).toBe(false);
     expect(changedSinceShared(store.songs[0])).toBe(false);
+  });
+});
+
+describe('"Make available globally"', () => {
+  const ref = (listed: boolean) => ({ shared: { shareId: 'x', version: 1, at: 1, listed } });
+
+  it('is not drawn where it could do nothing, and is where it leads to sign-in', () => {
+    expect(globalOffered('noDatabase')).toBe(false);
+    expect(globalOffered('noCrypto')).toBe(false);
+    expect(globalOffered('signedOut')).toBe(true);
+    expect(globalOffered(null)).toBe(true);
+    expect(globalAction({}, 'noDatabase', true)).toBeNull();
+    expect(globalAction({}, 'signedOut', true)).toBe('signIn');
+    expect(globalAction(ref(true), 'signedOut', false)).toBe('signIn');
+  });
+
+  it('ticked, shares a song never shared, and lists one shared by link', () => {
+    expect(globalAction({}, null, true)).toBe('share');
+    expect(globalAction(ref(false), null, true)).toBe('list');
+  });
+
+  it('unticked, takes it out of Shared songs and only that: the link still opens', () => {
+    expect(globalAction(ref(true), null, false)).toBe('unlist');
+    expect(globalAction({}, null, false)).toBeNull();
+  });
+
+  it('asking for what is already so does nothing', () => {
+    expect(globalAction(ref(true), null, true)).toBeNull();
+    expect(globalAction(ref(false), null, false)).toBeNull();
   });
 });
 

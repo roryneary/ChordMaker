@@ -27,6 +27,21 @@ export function rememberSyncedUid(uid: string): void {
   }
 }
 
+/** The same data, whatever order the keys came in — Firestore hands maps back sorted. */
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a).filter((k) => (a as Record<string, unknown>)[k] !== undefined);
+  const kb = Object.keys(b).filter((k) => (b as Record<string, unknown>)[k] !== undefined);
+  return (
+    ka.length === kb.length &&
+    ka.every((k) =>
+      sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
+    )
+  );
+}
+
 export interface MergeResult<T> {
   /** What the local library becomes. */
   merged: T[];
@@ -64,19 +79,33 @@ export interface MergeResult<T> {
  * unsynced work to their library. The caller decides by comparing the
  * incoming uid against `lastSyncedUid()`, and is handed `stranded` so that
  * work can be set aside rather than overwritten — see `stashLibrary`.
+ *
+ * `known` says this device's library already belongs to this account: it has
+ * been merged with it before (`lastSyncedUid()` is this uid), or this is a
+ * live update arriving after that. Then an entry held here, missing from the
+ * account and not on `unsynced`, is one the account confirmed once and has
+ * since lost — deleted on another device — so it goes here too, instead of
+ * being sent back up as new. Not known (a first sign-in on this device), the
+ * same entry is local work the account has never seen, and goes up.
+ *
+ * An entry whose copy here is identical to the account's stays the local
+ * object, so an update that changes nothing hands back the same entries and
+ * the caller can tell.
  */
 export function mergeOnSignIn<T extends { id: string }>(
   local: T[],
   remote: T[],
   allowPush: boolean,
   unsynced: readonly string[] = [],
+  known = false,
 ): MergeResult<T> {
-  const remoteIds = new Set(remote.map((s) => s.id));
-  const localOnly = local.filter((s) => !remoteIds.has(s.id));
-
-  if (!allowPush) return { merged: remote, toPush: [], toDelete: [], stranded: localOnly };
-
   const dirty = new Set(unsynced);
+  const remoteIds = new Set(remote.map((s) => s.id));
+  const absent = local.filter((s) => !remoteIds.has(s.id));
+
+  if (!allowPush) return { merged: remote, toPush: [], toDelete: [], stranded: absent };
+
+  const localOnly = known ? absent.filter((s) => dirty.has(s.id)) : absent;
   const localById = new Map(local.map((s) => [s.id, s] as const));
 
   const toDelete: string[] = [];
@@ -84,7 +113,7 @@ export function mergeOnSignIn<T extends { id: string }>(
   const kept: T[] = [];
   for (const theirs of remote) {
     const mine = localById.get(theirs.id);
-    if (!dirty.has(theirs.id)) kept.push(theirs);
+    if (!dirty.has(theirs.id)) kept.push(mine && sameValue(mine, theirs) ? mine : theirs);
     else if (mine) {
       kept.push(mine);
       localWins.push(mine);

@@ -40,6 +40,21 @@ export interface SongNote {
   wordId?: string;
 }
 
+/** What opening a song to edit asks after when it is missing (lib/details.ts). */
+export type SongDetail = 'artist' | 'notes';
+
+/**
+ * A YouTube video of the song being played, to see how it goes. `url` is
+ * always written one way (`youTubeUrl` in lib/videos.ts), a start time kept.
+ * `label` says what it is — "the lesson", "intro riff" — and is absent when
+ * nobody has said.
+ */
+export interface SongVideo {
+  id: string;
+  url: string;
+  label?: string;
+}
+
 /**
  * On the owner's song: it has been shared, and this is where. The shared copy
  * is a separate document (`shared/{shareId}`, see types/sharedSong.ts) — nobody
@@ -129,6 +144,18 @@ export interface Song {
    * them, and an empty list is never stored.
    */
   notes?: SongNote[];
+  /**
+   * Videos of it being played — a lesson, the band live. Optional, the `notes`
+   * precedent: absent when there are none, and an empty list is never stored.
+   */
+  videos?: SongVideo[];
+  /**
+   * The details this song has been said not to need — "no artist, it's a
+   * folk tune" — so opening it to edit stops asking (lib/details.ts). About
+   * this copy, not the song: it does not travel when the song is shared.
+   * Absent when nothing has been ticked.
+   */
+  notNeeded?: SongDetail[];
   /** Both optional, the `capo` precedent: absent is a meaningful state — never
       shared, made here — and every song already saved reads correctly without them. */
   shared?: SharedRef;

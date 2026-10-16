@@ -2,7 +2,7 @@ import { Plus, Trash } from '@phosphor-icons/react';
 import type { Song } from '../types/song';
 import type { Membership } from '../lib/playlists';
 import ChordDiagram from './ChordDiagram';
-import { songSubLine } from '../lib/songSummary';
+import { songFromTag, songSubLine } from '../lib/songSummary';
 
 /**
  * How many diagrams the preview row renders. The row shows however many fit the
@@ -62,6 +62,7 @@ export default function SongCard({
 }: Props) {
   const pills = onOpenPlaylist ? memberships : [];
   const title = song.title.trim() || 'Untitled';
+  const from = songFromTag(song);
 
   return (
     <div className="card song-card">
@@ -69,10 +70,11 @@ export default function SongCard({
         <span className="resume-head">
           <span className="resume-titles">
             <strong>{title}</strong>
-            <em>{songSubLine(song)}</em>
+            <em>{songSubLine(song, { from: false })}</em>
           </span>
           <span className="song-card-tags">
             {changed && <span className="tag tag-alert">Changed</span>}
+            {from && <span className="tag tag-from" title={from}>{from}</span>}
             {/* Only when the box below does not already say it: shared, but
                 by link alone. Unticking the box leaves a song here, and the
                 row has to go on saying that the link still opens. */}

@@ -38,6 +38,14 @@
   --color-accent: var(--color-accent-600);
   --color-divider: color-mix(in srgb, #292b31 15%, transparent);
 
+  /* Quiet text is --color-text mixed toward this. On light it is transparent,
+     so a 48% mix is ink at 48% opacity. On dark that same fade sinks to about
+     3:1 against the ground, so dark swaps in an opaque mid-grey: every quiet
+     step stays above 5:1 on the ground and on surfaces, and the steps keep
+     their order. Only the mixes in `color:` rules use it; hover fills and
+     borders still mix toward transparent. */
+  --color-quiet-base: transparent;
+
   /* The only non-accent hue in the system. Sign-in is the first screen that
      has to say "that is wrong" rather than merely "that is quiet", and a
      dimmed grey is not a refusal. Darker on light, lighter on dark, so it
@@ -84,6 +92,7 @@
     --color-accent: #9184d9;
     --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
     --color-danger: #f2b8b5;
+    --color-quiet-base: #6e7182;
 
     --tint-bg: var(--color-accent-900);
     --tint-text: var(--color-accent-200);
@@ -109,6 +118,7 @@
   --color-accent: #9184d9;
   --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
   --color-danger: #f2b8b5;
+  --color-quiet-base: #6e7182;
 
   --tint-bg: var(--color-accent-900);
   --tint-text: var(--color-accent-200);

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -6,23 +6,22 @@ import {
   ArrowsOutSimple,
   CaretLeft,
   CopySimple,
-  PaperPlaneTilt,
   PencilSimple,
   Plus,
-  Printer,
+  ShareNetwork,
   Swap,
   Trash,
-  Warning,
 } from '@phosphor-icons/react';
-import CapoChip, { CAPO_FRETS, capoChosen, capoLabel } from '../components/CapoChip';
+import CapoChip from '../components/CapoChip';
 import ChordDiagram from '../components/ChordDiagram';
 import DeleteSongSheet from '../components/DeleteSongSheet';
+import MissingDetailsSheet from '../components/MissingDetailsSheet';
 import SavedLine from '../components/SavedLine';
 import SongNotes, { NoteDraft, NoteField, type NoteHandlers } from '../components/SongNotes';
+import SongVideos, { type VideoHandlers } from '../components/SongVideos';
 import LyricBlock from '../components/lyric/LyricBlock';
 import { useIsDesktop } from '../components/shell/useBreakpoint';
-import { ordinal } from '../lib/numerals';
-import { lineCount, unchordedLineCount } from '../lib/lyric';
+import { detailsToAsk } from '../lib/details';
 import { newId } from '../lib/id';
 import { notesByWord } from '../lib/notes';
 import type { Membership } from '../lib/playlists';
@@ -34,7 +33,7 @@ import {
 } from '../lib/sharedSong';
 import type { SyncView } from '../lib/syncStatus';
 import type { SharedSong } from '../types/sharedSong';
-import type { SavedChord, Song } from '../types/song';
+import type { SavedChord, Song, SongDetail } from '../types/song';
 
 interface Props {
   song: Song;
@@ -53,9 +52,13 @@ interface Props {
   onOrderAsPlayed: () => void;
   /** How to play it: song-wide notes, patterns, and notes on words. */
   notesOn: NoteHandlers;
+  /** Videos of it being played: added, labelled, removed. */
+  videosOn: VideoHandlers;
   onTitle: (title: string) => void;
   /** Who plays it. Blank clears it — see the reducer's SET_ARTIST. */
   onArtist: (artist: string) => void;
+  /** "Not needed for this song", from the missing-details sheet. */
+  onNotNeeded: (detail: SongDetail, notNeeded: boolean) => void;
   /** The sender's newer version of this song, when there is one to offer. */
   update: SharedSong | null;
   /** The two answers to it. There is no third, blended one: see lib/sharedSong.ts. */
@@ -71,12 +74,14 @@ interface Props {
   onDelete: () => void;
 }
 
+/* Songs made before this moment are ones being come back to, and a song is
+   asked about what it is missing once a session — not again every time the
+   screen is left for the words editor and returned to. */
+const SESSION_START = Date.now();
+const askedThisSession = new Set<string>();
+
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 const spell = (n: number) => COUNT_WORDS[n] ?? String(n);
-const Spell = (n: number) => {
-  const word = spell(n);
-  return word.charAt(0).toUpperCase() + word.slice(1);
-};
 
 /** M04 / D1. The working screen: chords assembled, words pasted, chords placed. */
 export default function SongScreen({
@@ -93,8 +98,10 @@ export default function SongScreen({
   onMoveChord,
   onOrderAsPlayed,
   notesOn,
+  videosOn,
   onTitle,
   onArtist,
+  onNotNeeded,
   update,
   onReplaceMine,
   onKeepMine,
@@ -114,20 +121,20 @@ export default function SongScreen({
   };
   const [deleting, setDeleting] = useState(false);
   const [deciding, setDeciding] = useState(false);
+  /* What was missing as the screen opened, held fixed while the sheet is up. */
+  const [asking, setAsking] = useState<SongDetail[]>(() =>
+    askedThisSession.has(song.id) ? [] : detailsToAsk(song, SESSION_START),
+  );
+  useEffect(() => {
+    askedThisSession.add(song.id);
+  }, [song.id]);
+  const notesRef = useRef<HTMLDivElement>(null);
   /* Arranging: the tiles become ← / → instead of opening the editor. The one
      just moved is picked out, as a moved playlist row is, so a run of taps
      never loses track of which chord is travelling. */
   const [arranging, setArranging] = useState(false);
   const [movedId, setMovedId] = useState<string | null>(null);
-  /**
-   * Latched at the moment the check opens, not read live: choosing the capo
-   * inside the sheet would otherwise pull the question out from under the
-   * finger that just answered it.
-   */
-  const [checking, setChecking] = useState<{ capo: boolean; chords: boolean } | null>(null);
 
-  const lines = lineCount(song.lyric);
-  const toChord = unchordedLineCount(song.words, song.placements, lines);
   const meta = [song.key && `Key of ${song.key}`, song.feel].filter(Boolean).join(' · ');
   const hasLyric = song.lyric.trim().length > 0;
   /* The reading view shows chords on their own too, so there is something to
@@ -137,19 +144,6 @@ export default function SongScreen({
      needs is a name. autoFocus only acts at mount, which is exactly then — and
      it is what lets a lesson go name, capo, Add without a wasted tap. */
   const fresh = !song.title.trim() && song.chords.length === 0 && !hasLyric;
-
-  /**
-   * "Looks right" is a claim about a finished song, so the two things it can be
-   * wrong about get asked first. The capo is a hard stop — it has to be an
-   * answer, not a default — while a song with no chords is only warned about,
-   * because words on their own are a legitimate thing to print.
-   */
-  const finish = useCallback(() => {
-    const capo = !capoChosen(song.capo);
-    const chords = song.chords.length === 0;
-    if (capo || chords) setChecking({ capo, chords });
-    else onReady();
-  }, [song.capo, song.chords.length, onReady]);
 
   const place = useCallback(
     (chordId: string | null) => {
@@ -273,17 +267,24 @@ export default function SongScreen({
   );
 
   const notesHead = (
-    <div className="label-row">
+    <div className="label-row" ref={notesRef}>
       <h2>Notes</h2>
       <span>how to play it — strumming, picking, anything</span>
     </div>
   );
   const notesBlock = <SongNotes notes={song.notes} words={song.words} on={notesOn} newId={newId} />;
 
-  const footText = () =>
-    toChord > 0
-      ? `${Spell(toChord)} line${toChord === 1 ? '' : 's'} with no chords yet`
-      : 'Every line has a chord';
+  /* Beside the notes, because it answers the same question — how does this go —
+     by showing rather than telling. */
+  const videosBlock = (
+    <>
+      <div className="label-row label-row-videos">
+        <h2>Videos</h2>
+        <span>see how it is played</span>
+      </div>
+      <SongVideos videos={song.videos} on={videosOn} />
+    </>
+  );
 
   /* Every line, not a preview of the first few. This is the only screen where
      a chord is dropped on a word, so a line that is not drawn here is a line
@@ -305,14 +306,13 @@ export default function SongScreen({
             selectedWordId={picking}
             notes={byWord}
           />
-          <p className="words-block-foot">
-            <span>{footText()}</span>
-            {!isDesktop && (
+          {!isDesktop && (
+            <p className="words-block-foot">
               <button type="button" className="btn-ghost" onClick={onEditWords}>
                 Edit the words
               </button>
-            )}
-          </p>
+            </p>
+          )}
         </>
       ) : (
         <button type="button" className="words-empty" onClick={onEditWords}>
@@ -482,6 +482,20 @@ export default function SongScreen({
     </button>
   );
 
+  const detailsSheet = asking.length > 0 && (
+    <MissingDetailsSheet
+      song={song}
+      asking={asking}
+      onArtist={onArtist}
+      onNotNeeded={onNotNeeded}
+      onWriteNote={() => {
+        setAsking([]);
+        notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }}
+      onClose={() => setAsking([])}
+    />
+  );
+
   const deleteSheet = deleting && (
     <DeleteSongSheet
       song={song}
@@ -491,97 +505,6 @@ export default function SongScreen({
       onDelete={onDelete}
       onClose={() => setDeleting(false)}
     />
-  );
-
-  /**
-   * The gate behind "Looks right". Capo choices are chips here rather than the
-   * CapoChip's own menu: that menu is absolutely positioned, and inside a sheet
-   * that scrolls its own overflow it would be clipped.
-   */
-  const check = checking && (
-    <>
-      <button
-        type="button"
-        className="scrim"
-        aria-label="Close"
-        onClick={() => setChecking(null)}
-      />
-      <div className="sheet" role="dialog" aria-label="Before you call it finished">
-        <i className="grab" />
-        <h2>{checking.capo && checking.chords ? 'Two things first' : 'One thing first'}</h2>
-
-        {checking.chords && (
-          <div className="check-row">
-            <Warning size={20} />
-            <span>
-              <strong>No chords on this song yet</strong>
-              <em>
-                It will print as words on their own. That is allowed — this is only
-                checking you meant it.
-              </em>
-            </span>
-            <button type="button" className="btn-ghost" onClick={onAddChord}>
-              Add one
-            </button>
-          </div>
-        )}
-
-        {checking.capo && (
-          <div className="check-ask">
-            <p className="check-ask-q">
-              {capoChosen(song.capo) ? capoLabel(song.capo) : 'Is there a capo on?'}
-            </p>
-            <p className="check-ask-why">
-              {capoChosen(song.capo)
-                ? 'Change it here if that is not right.'
-                : 'Nobody has said yet, and it moves every chord on the sheet.'}
-            </p>
-            <div className="chips">
-              <button
-                type="button"
-                className={`chip${song.capo === null ? ' is-selected' : ''}`}
-                onClick={() => onCapo(null)}
-              >
-                No capo
-              </button>
-              {CAPO_FRETS.map((fret) => (
-                <button
-                  key={fret}
-                  type="button"
-                  className={`chip${song.capo === fret ? ' is-selected' : ''}`}
-                  onClick={() => onCapo(fret)}
-                  aria-label={`Capo on the ${ordinal(fret)}`}
-                >
-                  {ordinal(fret)}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="check-actions">
-          <button
-            type="button"
-            className="btn-primary btn-block"
-            disabled={!capoChosen(song.capo)}
-            onClick={() => {
-              setChecking(null);
-              onReady();
-            }}
-          >
-            {capoChosen(song.capo) ? 'Looks right' : 'Say about the capo first'}
-            <ArrowRight size={16} />
-          </button>
-          <button
-            type="button"
-            className="btn-ghost btn-block"
-            onClick={() => setChecking(null)}
-          >
-            Not yet
-          </button>
-        </div>
-      </div>
-    </>
   );
 
   if (isDesktop) {
@@ -606,14 +529,14 @@ export default function SongScreen({
               />
               {artistField}
             </div>
+            {/* One way out to everywhere a song goes — link, picture, page,
+                Shared songs — and the same sheet a song's row on Songs opens.
+                "Print for the stand" beside it went to that sheet too, so it
+                was a second name for one door. The capo is asked there. */}
             <div className="song-actions-d">
-              <button type="button" className="btn-secondary" onClick={finish}>
-                <Printer size={15} />
-                Print for the stand
-              </button>
-              <button type="button" className="btn-primary" onClick={finish}>
-                <PaperPlaneTilt size={15} />
-                Send it to someone
+              <button type="button" className="btn-primary" onClick={onReady}>
+                <ShareNetwork size={15} />
+                Share song
               </button>
             </div>
           </div>
@@ -641,6 +564,7 @@ export default function SongScreen({
 
           {notesHead}
           {notesBlock}
+          {videosBlock}
 
           <div className="label-row label-row-words">
             <h2>The words</h2>
@@ -666,9 +590,9 @@ export default function SongScreen({
           {deleteRow}
         </div>
         {picker}
-        {check}
         {decide}
         {deleteSheet}
+        {detailsSheet}
       </div>
     );
   }
@@ -717,6 +641,7 @@ export default function SongScreen({
 
         {notesHead}
         {notesBlock}
+        {videosBlock}
 
         <div className="label-row">
           <h2>The words</h2>
@@ -743,16 +668,16 @@ export default function SongScreen({
         <button
           type="button"
           className={`${playable ? 'btn-secondary' : 'btn-primary'} btn-block`}
-          onClick={finish}
+          onClick={onReady}
         >
-          Share or print
+          Share song
           {!playable && <ArrowRight size={16} />}
         </button>
       </div>
       {picker}
-      {check}
       {decide}
       {deleteSheet}
+      {detailsSheet}
     </div>
   );
 }

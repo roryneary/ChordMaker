@@ -196,7 +196,7 @@ h1, h2, h3, h4 {
   font-size: 10px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 42%, transparent);
+  color: color-mix(in srgb, var(--color-text) 42%, var(--color-quiet-base));
 }
 
 
@@ -211,7 +211,7 @@ h1, h2, h3, h4 {
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  color: color-mix(in srgb, var(--color-text) 78%, transparent);
+  color: color-mix(in srgb, var(--color-text) 78%, var(--color-quiet-base));
   font: inherit;
   font-size: 13.5px;
   text-align: left;
@@ -242,6 +242,29 @@ h1, h2, h3, h4 {
 .nav-foot { margin-top: auto; padding-top: 18px; margin-bottom: 8px; }
 .nav-foot + .user-chip { margin-top: 0; }
 
+/* Signed in, your name on the chip opens Settings. It fills the chip up to the
+   Out button and looks like the chip, not like a button inside one. */
+.user-chip-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: -6px -7px;
+  padding: 6px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.user-chip-open:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.user-chip.is-active .user-chip-open { background: var(--tint-bg); }
+.user-chip.is-active .user-chip-open strong { color: var(--tint-text); }
+.user-chip .sync-retry { align-self: center; margin-top: 0; }
+
 .avatar {
   flex: none;
   width: 28px;
@@ -260,7 +283,7 @@ h1, h2, h3, h4 {
 .user-meta em {
   font-style: normal;
   font-size: 10.5px;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--color-text) 45%, var(--color-quiet-base));
 }
 
 /* --- Tab bar ----------------------------------------------------------- */
@@ -282,7 +305,7 @@ h1, h2, h3, h4 {
   gap: 4px;
   border: 0;
   background: transparent;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--color-text) 45%, var(--color-quiet-base));
   font: inherit;
   font-size: 10px;
   cursor: pointer;
@@ -316,7 +339,7 @@ h1, h2, h3, h4 {
   font-size: 10px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 42%, transparent);
+  color: color-mix(in srgb, var(--color-text) 42%, var(--color-quiet-base));
 }
 
 .diagram { display: block; }
@@ -340,7 +363,7 @@ h1, h2, h3, h4 {
   max-width: 46ch;
   font-size: 15px;
   line-height: 1.55;
-  color: color-mix(in srgb, var(--color-text) 68%, transparent);
+  color: color-mix(in srgb, var(--color-text) 68%, var(--color-quiet-base));
 }
 
 .landing-more { align-self: flex-start; margin: 8px 0 0 calc(-1 * var(--space-1)); gap: 4px; }
@@ -357,7 +380,7 @@ h1, h2, h3, h4 {
 .greeting {
   margin: 30px 0 0;
   font-size: 13px;
-  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  color: color-mix(in srgb, var(--color-text) 52%, var(--color-quiet-base));
 }
 
 .display {
@@ -392,7 +415,7 @@ h1, h2, h3, h4 {
   margin-top: 9px;
   font-size: 13px;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  color: color-mix(in srgb, var(--color-text) 60%, var(--color-quiet-base));
 }
 
 /* A song card is a box with a button in it, not one big button: on the Songs
@@ -443,7 +466,7 @@ h1, h2, h3, h4 {
 .pill-add {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--color-divider);
-  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+  color: color-mix(in srgb, var(--color-text) 58%, var(--color-quiet-base));
 }
 .pill-add:hover {
   background: color-mix(in srgb, var(--color-text) 7%, transparent);
@@ -460,7 +483,7 @@ h1, h2, h3, h4 {
 .resume-titles em {
   font-style: normal;
   font-size: 12px;
-  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  color: color-mix(in srgb, var(--color-text) 52%, var(--color-quiet-base));
 }
 
 /* One row's worth of shapes, however wide the card is: slots fill the width
@@ -510,7 +533,7 @@ h1, h2, h3, h4 {
 .songs-empty p {
   margin: 0 0 8px;
   font-size: 14px;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-quiet-base));
 }
 
 .new-playlist { display: flex; gap: 8px; margin-top: 16px; max-width: 420px; }
@@ -519,7 +542,7 @@ h1, h2, h3, h4 {
 .field-note {
   margin: 8px 0 0;
   font-size: 12.5px;
-  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  color: color-mix(in srgb, var(--color-text) 60%, var(--color-quiet-base));
 }
 
 .playlist-card {
@@ -534,7 +557,7 @@ h1, h2, h3, h4 {
 .playlist-card:hover { box-shadow: var(--shadow-md); }
 .playlist-card .resume-titles { min-width: 0; }
 .playlist-card em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.playlist-card > svg { flex: none; color: color-mix(in srgb, var(--color-text) 40%, transparent); }
+.playlist-card > svg { flex: none; color: color-mix(in srgb, var(--color-text) 40%, var(--color-quiet-base)); }
 
 .playlist-name { flex: 1; min-width: 0; }
 .playlist-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -556,7 +579,7 @@ h1, h2, h3, h4 {
   font-family: var(--font-heading);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--color-text) 45%, var(--color-quiet-base));
 }
 .set-row-open {
   flex: 1;
@@ -584,7 +607,7 @@ h1, h2, h3, h4 {
 .pick-row-name em {
   font-style: normal;
   font-size: 12px;
-  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  color: color-mix(in srgb, var(--color-text) 52%, var(--color-quiet-base));
 }
 .set-row .icon-btn:disabled { opacity: 0.25; cursor: default; background: transparent; }
 /* The row you just moved, or the one whose pill brought you here. */
@@ -622,7 +645,7 @@ h1, h2, h3, h4 {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-quiet-base));
 }
 .pick-row input[type='checkbox'] {
   flex: none;
@@ -668,7 +691,7 @@ h1, h2, h3, h4 {
 .library-sub {
   margin: 6px 0 0;
   font-size: 13px;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-quiet-base));
 }
 
 .search {
@@ -681,7 +704,7 @@ h1, h2, h3, h4 {
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--color-text) 45%, var(--color-quiet-base));
 }
 
 .search:focus-within { box-shadow: inset 0 0 0 1px var(--color-accent); }
@@ -731,7 +754,7 @@ h1, h2, h3, h4 {
 .library-empty {
   margin-top: 24px;
   font-size: 14px;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-quiet-base));
 }
 
 @media (min-width: 1024px) {
@@ -804,7 +827,7 @@ h1, h2, h3, h4 {
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+  color: color-mix(in srgb, var(--color-text) 58%, var(--color-quiet-base));
   cursor: pointer;
 }
 
@@ -858,7 +881,7 @@ h1, h2, h3, h4 {
   font-size: 15px;
   font-weight: 400;
   line-height: 1.4;
-  color: color-mix(in srgb, var(--color-text) 62%, transparent);
+  color: color-mix(in srgb, var(--color-text) 62%, var(--color-quiet-base));
 }
 
 .editor-body {
@@ -872,7 +895,7 @@ h1, h2, h3, h4 {
   margin: 8px 0 0;
   font-size: 13.5px;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+  color: color-mix(in srgb, var(--color-text) 58%, var(--color-quiet-base));
 }
 
 .editor-plate {
@@ -901,7 +924,7 @@ h1, h2, h3, h4 {
   font-size: 13px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-quiet-base));
 }
 
 .position-stepper { display: flex; align-items: center; gap: 2px; }
@@ -924,7 +947,7 @@ h1, h2, h3, h4 {
 }
 
 .position-step:disabled {
-  color: color-mix(in srgb, var(--color-text) 25%, transparent);
+  color: color-mix(in srgb, var(--color-text) 25%, var(--color-quiet-base));
   cursor: default;
 }
 
@@ -949,20 +972,20 @@ h1, h2, h3, h4 {
   text-align: center;
 }
 
-.editor-name::placeholder { color: color-mix(in srgb, var(--color-text) 30%, transparent); }
+.editor-name::placeholder { color: color-mix(in srgb, var(--color-text) 30%, var(--color-quiet-base)); }
 .editor-name:focus-visible { outline: none; box-shadow: 0 1px 0 0 var(--color-accent); }
 
 .editor-guess {
   margin: 4px 0 0;
   font-size: 12px;
   text-align: center;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--color-text) 45%, var(--color-quiet-base));
 }
 
 .editor-prompt {
   margin: 0 0 12px;
   font-size: 13px;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-quiet-base));
 }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -992,7 +1015,7 @@ h1, h2, h3, h4 {
   border: 1px dashed color-mix(in srgb, var(--color-text) 30%, transparent);
   box-shadow: none;
   font-size: 13px;
-  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  color: color-mix(in srgb, var(--color-text) 52%, var(--color-quiet-base));
 }
 
 .editor-action {
@@ -1015,7 +1038,7 @@ h1, h2, h3, h4 {
   min-height: 34px;
   margin-bottom: 8px;
   font-size: 13.5px;
-  color: color-mix(in srgb, var(--color-text) 62%, transparent);
+  color: color-mix(in srgb, var(--color-text) 62%, var(--color-quiet-base));
 }
 .editor-keep p { margin: 0; line-height: 1.35; }
 .editor-keep label { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; color: var(--color-text); }
@@ -1056,7 +1079,7 @@ h1, h2, h3, h4 {
   font-size: 10px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--color-text) 45%, var(--color-quiet-base));
 }
 
 /* --- Chords above words -------------------------------------------------- */
@@ -1103,7 +1126,7 @@ button.word:hover .word-text {
   box-shadow: 0 0 0 3px var(--tint-bg);
 }
 
-.lyric-bare { color: color-mix(in srgb, var(--color-text) 54%, transparent); }
+.lyric-bare { color: color-mix(in srgb, var(--color-text) 54%, var(--color-quiet-base)); }
 .lyric-bare .word-text { color: inherit; }
 
 /* A blank line in the lyric is a gap, not an empty row. */
@@ -1128,7 +1151,7 @@ button.word:hover .word-text {
   margin-top: 16px;
   font-size: 12.5px;
   line-height: 1.55;
-  color: color-mix(in srgb, var(--color-text) 48%, transparent);
+  color: color-mix(in srgb, var(--color-text) 48%, var(--color-quiet-base));
 }
 
 /* The count, then what to do about it. Wraps rather than squeezing at 360px. */
@@ -1139,7 +1162,7 @@ button.word:hover .word-text {
   gap: 2px 10px;
   margin-top: 8px;
   font-size: 12.5px;
-  color: color-mix(in srgb, var(--color-text) 48%, transparent);
+  color: color-mix(in srgb, var(--color-text) 48%, var(--color-quiet-base));
 }
 
 /* Desktop: the box's heading on the left, what acts on the box on the right.
@@ -1179,7 +1202,7 @@ button.word:hover .word-text {
 }
 
 .words-bar strong { font-family: var(--font-heading); font-size: 16px; font-weight: 500; }
-.words-sub { font-size: 13.5px; color: color-mix(in srgb, var(--color-text) 48%, transparent); }
+.words-sub { font-size: 13.5px; color: color-mix(in srgb, var(--color-text) 48%, var(--color-quiet-base)); }
 .spacer { flex: 1; }
 .icon-btn.accent { color: var(--color-accent); }
 
@@ -1214,7 +1237,7 @@ button.word:hover .word-text {
   gap: 10px;
   margin-top: 14px;
   font-size: 12.5px;
-  color: color-mix(in srgb, var(--color-text) 48%, transparent);
+  color: color-mix(in srgb, var(--color-text) 48%, var(--color-quiet-base));
 }
 
 /* The count is two words and must not break across them. */
@@ -1243,7 +1266,7 @@ button.word:hover .word-text {
 .preview-empty {
   margin: 0;
   font-size: 14px;
-  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  color: color-mix(in srgb, var(--color-text) 40%, var(--color-quiet-base));
 }
 
 .preview-note {
@@ -1253,7 +1276,7 @@ button.word:hover .word-text {
   margin: auto 0 0;
   padding-top: 15px;
   font-size: 12.5px;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--color-text) 45%, var(--color-quiet-base));
 }
 
 .preview-note svg { flex: none; margin-top: 1px; }
@@ -1270,7 +1293,7 @@ button.word:hover .word-text {
   max-width: 44ch;
   font-size: 13.5px;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-quiet-base));
 }
 
 /* One chord, opened. */
@@ -1386,7 +1409,7 @@ button.word:hover .word-text {
   margin-top: -12px;
   font-size: 13px;
   letter-spacing: 0.01em;
-  color: color-mix(in srgb, var(--color-text) 48%, transparent);
+  color: color-mix(in srgb, var(--color-text) 48%, var(--color-quiet-base));
   animation: splash-rise 620ms cubic-bezier(0.2, 0.7, 0.2, 1) 760ms both;
 }
 
@@ -1436,7 +1459,7 @@ button.word:hover .word-text {
 .user-chip.is-action > svg:last-child {
   flex: none;
   margin-left: auto;
-  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  color: color-mix(in srgb, var(--color-text) 40%, var(--color-quiet-base));
 }
 /* The account screen's sync line, now under the chip rather than in it. */
 .account-sync { margin: 8px 2px 0; }
@@ -1491,7 +1514,7 @@ button.word:hover .word-text {
 .signin-sub {
   margin: 0 0 28px;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+  color: color-mix(in srgb, var(--color-text) 58%, var(--color-quiet-base));
 }
 
 /* Fields and buttons share a height, so the column reads as one stack. */
@@ -1511,7 +1534,7 @@ button.word:hover .word-text {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-quiet-base));
   font-size: 12px;
   text-transform: lowercase;
   margin: 20px 0 8px;
@@ -1531,7 +1554,7 @@ button.word:hover .word-text {
 .signin-form .micro-label { margin: 14px 0 7px; }
 .signin-form .btn-block { margin-top: 22px; }
 
-.signin-hint { margin: 8px 0 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 58%, transparent); }
+.signin-hint { margin: 8px 0 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 58%, var(--color-quiet-base)); }
 /* Errors are a colour and a sentence, never an icon and a code. */
 .signin-error { margin: 8px 0 0; font-size: 13px; color: var(--color-danger); }
 
@@ -1545,7 +1568,7 @@ button.word:hover .word-text {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: center;
-  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  color: color-mix(in srgb, var(--color-text) 40%, var(--color-quiet-base));
   user-select: text;
 }
 .version-line span { white-space: nowrap; }

@@ -9,6 +9,7 @@ import {
 } from 'react';
 import {
   ArrowsIn,
+  ArrowsInLineVertical,
   ArrowsInSimple,
   ArrowsOut,
   Columns,
@@ -17,6 +18,7 @@ import {
   PencilSimple,
   Rows,
   Sun,
+  TextAa,
 } from '@phosphor-icons/react';
 import CapoChip from '../components/CapoChip';
 import ChordDiagram from '../components/ChordDiagram';
@@ -27,13 +29,16 @@ import { usePrefs } from '../hooks/usePrefs';
 import { isChordLine, wordsOnly } from '../lib/chordLines';
 import { groupByLine, lineCount } from '../lib/lyric';
 import { NOTE_KIND_LABEL, notesByWord, songWideNotes } from '../lib/notes';
+import { VideoLink } from '../components/SongVideos';
 import {
+  type FitSearch,
   type PageItem,
-  type PagePair,
-  clampPair,
+  clampSpread,
+  fitStep,
   paginate,
-  rollBack,
-  rollForward,
+  spreadBack,
+  spreadForward,
+  startFit,
   turnBack,
   turnForward,
 } from '../lib/pages';
@@ -84,6 +89,13 @@ const NOTES_OPEN_KEY = 'chord-builder:fs-notes-open:v1';
 const TWO_PAGES_KEY = 'chord-builder:fs-two-pages:v1';
 const TURNED_KEY = 'chord-builder:fs-turned:v1';
 const CHORDS_SHOWN_KEY = 'chord-builder:fs-chords-shown:v1';
+const FIT_KEY = 'chord-builder:fs-fit:v1';
+
+/**
+ * The smallest a song is shrunk to fit two pages: 60% of the drawn size, about
+ * 16px words on a wide screen. Smaller and it is not read from a stand.
+ */
+const FIT_FLOOR = 0.6;
 
 const NO_PLACEMENTS: Placements = {};
 
@@ -184,7 +196,13 @@ function isTurnTap(e: MouseEvent): boolean {
   return !window.getSelection()?.toString();
 }
 
-/** The top quarter of the words goes back; anywhere else goes on. */
+/** Two pages, read like a book: the left page goes back, the right goes on. */
+function tapOnLeft(e: MouseEvent<HTMLElement>): boolean {
+  const box = e.currentTarget.getBoundingClientRect();
+  return e.clientX - box.left < box.width / 2;
+}
+
+/** One column: the top quarter of the words goes back; anywhere else goes on. */
 function tapGoesBack(e: MouseEvent<HTMLElement>): boolean {
   const box = e.currentTarget.getBoundingClientRect();
   return e.clientY - box.top < box.height * 0.25;
@@ -200,7 +218,8 @@ function tapGoesBack(e: MouseEvent<HTMLElement>): boolean {
  * A tap on the words turns the page, because scrolling takes a hand off the
  * guitar for as long as it takes and a tap for an instant. One column turns by
  * a screenful, carrying the line you were on to the top, marked. Where there is
- * room, two pages sit side by side and roll: the one you finished turns.
+ * room, two pages sit side by side like a book: the right page goes on two
+ * pages, the left goes back two.
  */
 export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, action }: Props) {
   const isDesktop = useIsDesktop();
@@ -214,11 +233,24 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [twoPages, setTwoPages] = useDeviceFlag(TWO_PAGES_KEY, true);
   const [turned, setTurned] = useDeviceFlag(TURNED_KEY, false);
+  const [fitOn, setFitOn] = useDeviceFlag(FIT_KEY, true);
   const byWord = notesByWord(song.notes);
   const wide = songWideNotes(song.notes);
   const paged = hasWords && twoFit && twoPages;
+  const fitting = paged && fitOn;
 
-  const sizes = readingSizes(isDesktop, scale);
+  /* --- Two pages, fitted: the text shrunk until the song is one spread ----- */
+
+  /** The pages' size, "w×h": the room a fit is for. */
+  const [room, setRoom] = useState('');
+  // A fit holds for one song drawn one way in one room; anything else starts again.
+  const fitKey = [song.id, song.updatedAt, scale, chordsShown, notesOpen, isDesktop, room].join('|');
+  const [fitState, setFitState] = useState<{ key: string; search: FitSearch } | null>(null);
+  const search = fitState?.key === fitKey ? fitState.search : startFit(scale, FIT_FLOOR);
+  /** What the song is drawn at: the player's size, or smaller to fit. */
+  const readScale = fitting ? search.at : scale;
+
+  const sizes = readingSizes(isDesktop, readScale);
 
   const lines = lineCount(song.lyric);
   const grouped = groupByLine(song.words, lines);
@@ -256,7 +288,7 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
     if (!turned) setTurned(true);
   };
 
-  /* --- Two pages, rolling ---------------------------------------------------- */
+  /* --- Two pages, a spread at a time ---------------------------------------------------- */
 
   // Both pages draw the whole song and show a slice of it; the left one is measured.
   const measuredCol = useRef<HTMLDivElement>(null);
@@ -265,45 +297,67 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
     items: [],
     starts: [0],
   });
-  const [pair, setPair] = useState<PagePair>([0, 1]);
-  /** Which side last turned, counted so every turn flashes afresh. */
-  const [flash, setFlash] = useState<{ side: 0 | 1; n: number } | null>(null);
+  /** The spread showing, named by its left page. */
+  const [spread, setSpread] = useState(0);
+  /** Counts turns, so every turn flashes afresh. */
+  const [flash, setFlash] = useState(0);
 
   useLayoutEffect(() => {
     const col = measuredCol.current;
     const body = measuredBody.current;
     if (!paged || !col || !body) return;
+    const roomNow = `${body.clientWidth}x${body.clientHeight}`;
+    if (roomNow !== room) {
+      // A new room is a new fit: settled before the first paint, not after.
+      setRoom(roomNow);
+      return;
+    }
     // Cut again whenever the song, the size or the room changes — the notes
-    // opening included, which is the column growing.
+    // opening included, which is the column growing. While fitting, each cut
+    // is a step of the search; these all run before the screen paints, so the
+    // sizes tried are never seen.
     const measure = () => {
       const items = readItems(col, 0);
       const starts = paginate(items, body.clientHeight);
       const next = { items, starts };
       setLayout((was) => (JSON.stringify(was) === JSON.stringify(next) ? was : next));
+      if (fitting && !search.done) setFitState({ key: fitKey, search: fitStep(search, starts.length) });
     };
     measure();
-    const watch = new ResizeObserver(measure);
-    watch.observe(col);
-    watch.observe(body);
-    return () => watch.disconnect();
-  }, [paged, song, scale, chordsShown]);
+    const watchCol = new ResizeObserver(measure);
+    watchCol.observe(col);
+    const watchRoom = new ResizeObserver(() => setRoom(`${body.clientWidth}x${body.clientHeight}`));
+    watchRoom.observe(body);
+    return () => {
+      watchCol.disconnect();
+      watchRoom.disconnect();
+    };
+  }, [paged, fitting, fitKey, search, room, song, readScale, chordsShown]);
 
   const pageCount = layout.starts.length;
-  const shown = clampPair(pair, pageCount);
+  const shown = clampSpread(spread, pageCount);
 
   const turnPages = (back: boolean) => {
-    const next = back ? rollBack(shown) : rollForward(shown, pageCount);
-    if (next[0] === shown[0] && next[1] === shown[1]) return;
-    setPair(next);
-    setFlash((was) => ({ side: next[0] !== shown[0] ? 0 : 1, n: (was?.n ?? 0) + 1 }));
+    const next = back ? spreadBack(shown) : spreadForward(shown, pageCount);
+    if (next === shown) return;
+    setSpread(next);
+    setFlash((n) => n + 1);
     if (!turned) setTurned(true);
   };
 
   /* --- The song, as items a turn can measure ------------------------------- */
 
-  const notesPanel = wide.length > 0 && (
+  const videos = song.videos ?? [];
+  /* "Notes 2", "Videos 1", or both: what the closed panel holds. */
+  const panelParts = [
+    wide.length > 0 && ['Notes', wide.length] as const,
+    videos.length > 0 && ['Videos', videos.length] as const,
+  ].filter((p) => p !== false);
+
+  const notesPanel = panelParts.length > 0 && (
     /* At the top of the words rather than pinned: read before playing, then
-       turned past. Closed, it is one line; that is remembered. */
+       turned past. Closed, it is one line; that is remembered. The videos are
+       in it too: like the notes, they are for before you play. */
     <details
       className="fs-notes"
       data-item=""
@@ -311,7 +365,12 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
       onToggle={(e) => setNotesOpen(e.currentTarget.open)}
     >
       <summary>
-        Notes <em>{wide.length}</em>
+        {panelParts.map(([name, n], i) => (
+          <span key={name}>
+            {i > 0 && ' · '}
+            {name} <em>{n}</em>
+          </span>
+        ))}
       </summary>
       {wide.map((note) => (
         <div key={note.id} className={`fs-note note-${note.kind}`}>
@@ -319,6 +378,13 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
           <p style={{ fontSize: Math.max(12, sizes.word * 0.7) }}>{note.text}</p>
         </div>
       ))}
+      {videos.length > 0 && (
+        <div className="fs-videos">
+          {videos.map((video) => (
+            <VideoLink key={video.id} video={video} />
+          ))}
+        </div>
+      )}
     </details>
   );
 
@@ -329,13 +395,15 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
     return (
       /* The space between lines shrinks with the words: at the small sizes the
          point is more of the song on the screen, and fixed gaps would spend it.
-         With the chords off there is no chord row to make room for, so the lines
+         Small even with the chords on: the chord row above each line already
+         parts it from the one before, so a wide gap on top of that only spent
+         the screen. With the chords off there is no chord row, so the lines
          close right up — the whole point of reading words only. */
       <div
         ref={measured === 'scrolled' ? scrolledCol : measured === 'page' ? measuredCol : undefined}
         className={`fs-col${chordsShown ? '' : ' fs-col-text'}`}
         style={{
-          gap: Math.round((chordsShown ? (isDesktop ? 24 : 20) : isDesktop ? 6 : 4) * scale),
+          gap: Math.round((chordsShown ? (isDesktop ? 10 : 8) : isDesktop ? 6 : 4) * readScale),
           transform: shift ? `translateY(${-shift}px)` : undefined,
         }}
       >
@@ -383,8 +451,7 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
   };
 
   const page = (side: 0 | 1) => {
-    const p = shown[side];
-    const other = shown[side === 0 ? 1 : 0];
+    const p = shown + side;
     const { items, starts } = layout;
     const exists = p < pageCount;
     const start = starts[p] ?? 0;
@@ -400,8 +467,8 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
               <span>
                 Page {p + 1} of {pageCount}
               </span>
-              {/* Pages read low to high; once the left has turned, it is the one read next. */}
-              {side === 0 && p > other && <em>next</em>}
+              {/* Said, so smaller text is not taken for the size setting going wrong. */}
+              {side === 0 && readScale < scale && <span>· text {Math.round(readScale * 100)}% to fit</span>}
             </>
           )}
         </div>
@@ -409,7 +476,7 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
           <div className="fs-page-clip" style={{ height, visibility: exists ? undefined : 'hidden' }}>
             {column(side === 0 ? 'page' : null, null, top)}
           </div>
-          {flash?.side === side && <span key={flash.n} className="fs-page-flash" />}
+          {flash > 0 && <span key={flash} className="fs-page-flash" />}
         </div>
       </section>
     );
@@ -480,6 +547,17 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
               {twoPages ? 'One column' : 'Two pages'}
             </button>
           )}
+          {paged && (
+            <button
+              type="button"
+              className="btn-ghost fs-edit"
+              onClick={() => setFitOn(!fitOn)}
+              title={fitOn ? 'Keep the text size, and turn pages' : 'Shrink the text so the song fits two pages'}
+            >
+              {fitOn ? <TextAa size={15} /> : <ArrowsInLineVertical size={15} />}
+              {fitOn ? 'Keep my text size' : 'Fit to two pages'}
+            </button>
+          )}
         </div>
       )}
 
@@ -500,9 +578,9 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
       )}
 
       {paged ? (
-        /* Two pages, a tap to turn: the one you finished turns, the one you are
-           reading stays where it is. */
-        <div className="fs-pages" onClick={(e) => isTurnTap(e) && turnPages(tapGoesBack(e))}>
+        /* Two pages, a tap to turn, like a book: the right page goes on, the
+           left goes back. */
+        <div className="fs-pages" onClick={(e) => isTurnTap(e) && turnPages(tapOnLeft(e))}>
           {page(0)}
           {page(1)}
         </div>
@@ -544,9 +622,12 @@ export default function FullScreen({ song, nameOf, onExit, onEdit, kicker, actio
           </>
         )}
         <span className="spacer" />
-        {/* Until this device has turned a page, the bar says how; after that it is known. */}
-        {hasWords && !turned ? (
-          <span className="fs-hint">Tap to turn · top to go back</span>
+        {/* Until this device has turned a page, the bar says how; after that it is
+            known. A song that fits one spread has nothing to turn. */}
+        {hasWords && !turned && !(paged && pageCount <= 2) ? (
+          <span className="fs-hint">
+            {paged ? 'Tap right to turn · left to go back' : 'Tap to turn · top to go back'}
+          </span>
         ) : (
           <span className="fs-awake">
             <Sun size={15} />

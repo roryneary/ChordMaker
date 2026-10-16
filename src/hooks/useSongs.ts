@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ChordSpec } from '../types/chord';
-import type { NoteKind, SavedChord, Song, SongNote } from '../types/song';
+import type { NoteKind, SavedChord, Song, SongDetail, SongNote, SongVideo } from '../types/song';
 import type { Playlist } from '../types/playlist';
 import type { MyChord } from '../types/myChord';
 import type { SharedSong } from '../types/sharedSong';
@@ -9,6 +9,7 @@ import { isBlankSong } from '../lib/songSummary';
 import { chordChanged } from '../lib/chordEdits';
 import { orderByFirstUse } from '../lib/chordOrder';
 import { pruneNoteWords } from '../lib/notes';
+import { MAX_VIDEOS, MAX_VIDEO_LABEL_CHARS, youTubeUrl } from '../lib/videos';
 import { cleanChordName, collapseByShape, keepOffer, newMyChord } from '../lib/myChords';
 import { newId } from '../lib/id';
 import { prunePlacements, pruneToChords, retokenise } from '../lib/lyric';
@@ -21,13 +22,13 @@ import {
   saveStore,
 } from '../lib/storage';
 import { firebaseEnabled } from '../lib/firebase';
-import { deleteRemoteSong, fetchRemoteSongs, writeSong } from '../lib/songSync';
+import { deleteRemoteSong, watchRemoteSongs, writeSong } from '../lib/songSync';
 import {
   deleteRemotePlaylist,
-  fetchRemotePlaylists,
+  watchRemotePlaylists,
   writePlaylist,
 } from '../lib/playlistSync';
-import { deleteRemoteMyChord, fetchRemoteMyChords, writeMyChord } from '../lib/chordSync';
+import { deleteRemoteMyChord, watchRemoteMyChords, writeMyChord } from '../lib/chordSync';
 import {
   cleanPlaylistName,
   moveItem,
@@ -54,15 +55,18 @@ import {
 } from '../lib/syncStatus';
 
 export type SongsAction =
-  /** The account's library has arrived. The merge happens here, in the reducer,
-      against the store as it is *now* — not against whatever the hook captured
-      before it started fetching. */
+  /** The account's library has arrived, or changed since. The merge happens
+      here, in the reducer, against the store as it is *now* — not against
+      whatever the hook captured before it started listening. */
   | {
       type: 'HYDRATE';
-      remote: Song[];
+      /** Absent leaves the songs alone: a live update names one collection. */
+      remote?: Song[];
       allowPush: boolean;
+      /** This device's library is already this account's — see `mergeOnSignIn`. */
+      known?: boolean;
       restored?: Song[];
-      /** Absent leaves the playlists alone; the hook always sends them. */
+      /** Absent leaves the playlists alone. */
       remotePlaylists?: Playlist[];
       restoredPlaylists?: Playlist[];
       /** The same again for My chords. */
@@ -98,6 +102,13 @@ export type SongsAction =
   | { type: 'ADD_NOTE'; id: string; note: SongNote }
   | { type: 'UPDATE_NOTE'; id: string; noteId: string; text: string; kind?: NoteKind }
   | { type: 'REMOVE_NOTE'; id: string; noteId: string }
+  /** Videos of it being played. `url` is whatever was pasted; the reducer reads
+      it (`youTubeUrl`) and adds nothing for a link that is not YouTube's. */
+  | { type: 'ADD_VIDEO'; id: string; videoId: string; url: string; label?: string }
+  | { type: 'LABEL_VIDEO'; id: string; videoId: string; label: string }
+  | { type: 'REMOVE_VIDEO'; id: string; videoId: string }
+  /** "Not needed for this song": stops the song screen asking for that detail. */
+  | { type: 'SET_NOT_NEEDED'; id: string; detail: SongDetail; notNeeded: boolean }
   /** "Order as played": by the first word each chord is dropped on. See lib/chordOrder.ts. */
   | { type: 'ORDER_CHORDS_AS_PLAYED'; id: string }
   | { type: 'PLACE_CHORD'; id: string; wordId: string; chordId: string | null }
@@ -156,6 +167,17 @@ function songWithNotes(song: Song, notes: SongNote[]): Song {
   return next;
 }
 
+/** The song with these videos, and no `videos` key at all when there are none. */
+function songWithVideos(song: Song, videos: SongVideo[]): Song {
+  const next = { ...song, videos };
+  if (!videos.length) delete (next as Partial<Song>).videos;
+  return next;
+}
+
+/** A label as stored: trimmed, capped, and absent rather than blank. */
+const videoLabel = (label: string | undefined) =>
+  label?.trim().slice(0, MAX_VIDEO_LABEL_CHARS) || undefined;
+
 /** Applies `change` to one song and stamps it, leaving the rest of the store alone. */
 function editSong(
   store: SongStore,
@@ -198,7 +220,54 @@ function editPlaylist(
 
 type Hydrate = Extract<SongsAction, { type: 'HYDRATE' }>;
 
-/** The playlists' half of a sign-in. Nothing, if the account sent none to merge. */
+/** Same entries in the same order: the merge keeps unchanged entries as the same objects. */
+const sameList = (a: readonly unknown[], b: readonly unknown[]) =>
+  a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** Only the fields of `next` that actually differ from the store's. */
+function withoutNoChange(store: SongStore, next: Partial<SongStore>): Partial<SongStore> {
+  const out: Partial<SongStore> = {};
+  for (const [key, value] of Object.entries(next) as [keyof SongStore, unknown][]) {
+    const held = store[key];
+    const same =
+      Array.isArray(value) && Array.isArray(held) ? sameList(value, held) : value === held;
+    if (!same) (out as Record<string, unknown>)[key] = value;
+  }
+  return out;
+}
+
+/** The songs' half. Nothing, if the account sent none to merge. */
+function hydrateSongs(store: SongStore, action: Hydrate): Partial<SongStore> {
+  if (!action.remote) return {};
+  const { merged, toPush, toDelete } = mergeOnSignIn(
+    store.songs,
+    action.remote,
+    action.allowPush,
+    store.unsynced,
+    action.known,
+  );
+  // Work set aside the last time a different account used this device.
+  // It only fills gaps: anything the account already holds wins, as ever.
+  const have = new Set(merged.map((s) => s.id));
+  const restored = (action.restored ?? []).filter((s) => !have.has(s.id));
+
+  // Newest first. The account hands songs back in document-id order, which
+  // is no order at all, and the Songs screen lists them as they are held.
+  const songs = [...merged, ...restored].sort((a, b) => b.updatedAt - a.updatedAt);
+
+  // Keeps the open song open if the merge still has it; falls back rather
+  // than pointing at nothing, same as OPEN_SONG's own guard.
+  const currentId = songs.some((s) => s.id === store.currentId)
+    ? store.currentId
+    : (songs[0]?.id ?? null);
+
+  // Exactly what still has to go up. Anything else the old list named is
+  // either confirmed by the account or belongs to a library now set aside.
+  const unsynced = [...toPush.map((s) => s.id), ...toDelete, ...restored.map((s) => s.id)];
+  return { songs, currentId, unsynced };
+}
+
+/** The playlists' half. Nothing, if the account sent none to merge. */
 function hydratePlaylists(store: SongStore, action: Hydrate): Partial<SongStore> {
   // They take the same merge as songs, by the same rule. They keep the order
   // they are in rather than sorting by stamp: reordering a set should not also
@@ -209,6 +278,7 @@ function hydratePlaylists(store: SongStore, action: Hydrate): Partial<SongStore>
     action.remotePlaylists,
     action.allowPush,
     store.unsyncedPlaylists,
+    action.known,
   );
   const haveList = new Set(lists.merged.map((p) => p.id));
   const restoredLists = (action.restoredPlaylists ?? []).filter((p) => !haveList.has(p.id));
@@ -242,6 +312,7 @@ function hydrateChords(store: SongStore, action: Hydrate): Partial<SongStore> {
     action.remoteChords,
     action.allowPush,
     store.unsyncedChords,
+    action.known,
   );
   const have = new Set(mine.merged.map((c) => c.id));
   const restored = (action.restoredChords ?? []).filter((c) => !have.has(c.id));
@@ -275,41 +346,16 @@ function editMyChord(
 export function songsReducer(store: SongStore, action: SongsAction): SongStore {
   switch (action.type) {
     case 'HYDRATE': {
-      const { merged, toPush, toDelete } = mergeOnSignIn(
-        store.songs,
-        action.remote,
-        action.allowPush,
-        store.unsynced,
-      );
-      // Work set aside the last time a different account used this device.
-      // It only fills gaps: anything the account already holds wins, as ever.
-      const have = new Set(merged.map((s) => s.id));
-      const restored = (action.restored ?? []).filter((s) => !have.has(s.id));
-
-      // Newest first. The account hands songs back in document-id order, which
-      // is no order at all, and the Songs screen lists them as they are held.
-      const songs = [...merged, ...restored].sort((a, b) => b.updatedAt - a.updatedAt);
-
-      // Keeps the open song open if the merge still has it; falls back rather
-      // than pointing at nothing, same as OPEN_SONG's own guard.
-      const currentId = songs.some((s) => s.id === store.currentId)
-        ? store.currentId
-        : (songs[0]?.id ?? null);
-
-      // Exactly what still has to go up. Anything else the old list named is
-      // either confirmed by the fetch or belongs to a library now set aside.
-      const unsynced = [...toPush.map((s) => s.id), ...toDelete, ...restored.map((s) => s.id)];
-
-      // Each of the other two collections is merged only if the account sent
-      // it, and is otherwise left exactly as it was.
-      return {
-        ...store,
-        songs,
-        currentId,
-        unsynced,
+      // Each collection is merged only if the account sent it, and is
+      // otherwise left exactly as it was. A live update that changes nothing —
+      // the echo of this device's own write, most often — returns the store
+      // itself, so nothing re-renders or is saved again for it.
+      const next = withoutNoChange(store, {
+        ...hydrateSongs(store, action),
         ...hydratePlaylists(store, action),
         ...hydrateChords(store, action),
-      };
+      });
+      return Object.keys(next).length ? { ...store, ...next } : store;
     }
 
     case 'MY_CHORD_SYNCED': {
@@ -490,6 +536,68 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
         return songWithNotes(s, s.notes.filter((n) => n.id !== action.noteId));
       });
 
+    case 'ADD_VIDEO':
+      return editSong(store, action.id, (s) => {
+        const url = youTubeUrl(action.url);
+        const held = s.videos ?? [];
+        // The same video from the same point is already here: adding it again
+        // is no edit, not a second row.
+        if (!url || held.length >= MAX_VIDEOS || held.some((v) => v.url === url)) return s;
+        const label = videoLabel(action.label);
+        return { ...s, videos: [...held, { id: action.videoId, url, ...(label ? { label } : {}) }] };
+      });
+
+    case 'LABEL_VIDEO':
+      return editSong(store, action.id, (s) => {
+        const held = s.videos?.find((v) => v.id === action.videoId);
+        if (!held || !s.videos) return s;
+        const label = videoLabel(action.label);
+        // Unchanged is no edit, as with a note.
+        if (label === held.label) return s;
+        return {
+          ...s,
+          videos: s.videos.map((v) => {
+            if (v.id !== action.videoId) return v;
+            const next = { ...v };
+            delete next.label;
+            return label ? { ...next, label } : next;
+          }),
+        };
+      });
+
+    case 'REMOVE_VIDEO':
+      return editSong(store, action.id, (s) => {
+        if (!s.videos?.some((v) => v.id === action.videoId)) return s;
+        return songWithVideos(s, s.videos.filter((v) => v.id !== action.videoId));
+      });
+
+    case 'SET_NOT_NEEDED': {
+      const before = store.songs.find((s) => s.id === action.id);
+      const next = editSong(store, action.id, (s) => {
+        const held = s.notNeeded ?? [];
+        if (held.includes(action.detail) === action.notNeeded) return s;
+        const list = action.notNeeded
+          ? [...held, action.detail]
+          : held.filter((d) => d !== action.detail);
+        const out = { ...s, notNeeded: list };
+        if (!list.length) delete (out as Partial<Song>).notNeeded;
+        return out;
+      });
+      /* This does not travel with a shared song, so it must not read as "you've
+         changed this since you shared it" — which would offer to share changes
+         nobody else would see. If the song was up to date with its share, it
+         still is. */
+      const after = next.songs.find((s) => s.id === action.id);
+      if (next === store || !before?.shared || !after?.shared) return next;
+      if (before.updatedAt > before.shared.at) return next;
+      return {
+        ...next,
+        songs: next.songs.map((s) =>
+          s.id === action.id ? { ...s, shared: { ...after.shared!, at: after.updatedAt } } : s,
+        ),
+      };
+    }
+
     case 'ADD_CHORD': {
       if (!named(action.spec)) return store;
       const spec = trimName(action.spec);
@@ -584,6 +692,8 @@ export function songsReducer(store: SongStore, action: SongsAction): SongStore {
           id: s.id,
           ...action.shared.song,
           ...(s.shared ? { shared: s.shared } : {}),
+          // This player's own "not needed" ticks are about their copy, and stay.
+          ...(s.notNeeded ? { notNeeded: s.notNeeded } : {}),
           copiedFrom: lineageOf(action.shared),
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
@@ -689,9 +799,10 @@ const isOnline = () => (typeof navigator === 'undefined' ? true : navigator.onLi
 
 /**
  * `uid` is null signed out. Signed in, `localStorage` is still what the UI
- * reads and writes through the reducer — nothing here changes that. A sign-in
- * pulls the account's library down and merges it in (`mergeOnSignIn`, in
- * accountSync.ts), and every local change thereafter is mirrored up.
+ * reads and writes through the reducer — nothing here changes that. Signed
+ * in, the account's library is listened to and merged in (`mergeOnSignIn`, in
+ * accountSync.ts) on sign-in and again whenever another device changes it, and
+ * every local change is mirrored up.
  *
  * What goes up is driven by `store.unsynced`, not by diffing renders: the
  * reducer lists every id it changes, this sends them, and only the account's
@@ -708,6 +819,9 @@ export function useSongs(uid: string | null) {
   );
   /** Bumped to re-run the effects below: by Retry, and by the signal returning. */
   const [attempt, setAttempt] = useState(0);
+  /** Bumped to listen to the account again — only ever after the listening failed. */
+  const [relisten, setRelisten] = useState(0);
+  const listenFailed = useRef(false);
 
   useEffect(() => {
     saveStore(store);
@@ -743,6 +857,7 @@ export function useSongs(uid: string | null) {
       if (online) {
         failed.current.clear();
         setAttempt((n) => n + 1);
+        if (listenFailed.current) setRelisten((n) => n + 1);
       }
     };
     window.addEventListener('online', changed);
@@ -755,76 +870,112 @@ export function useSongs(uid: string | null) {
 
   const hydrated = sync.hydrated && sync.uid === account;
 
+  /* The account is listened to, not fetched once: a change made on another
+     device arrives here while this one is open, and is merged by the same rule
+     as a sign-in. The first answer from all three collections is the sign-in
+     merge proper — the stash, the cross-account guard — and every answer after
+     it merges just the collection that changed. */
   useEffect(() => {
-    if (!account || hydrated) return;
+    if (!account) return;
     const uid = account;
     let cancelled = false;
+    listenFailed.current = false;
+
+    let songs: Song[] | null = null;
+    let playlists: Playlist[] | null = null;
+    let chords: MyChord[] | null = null;
+    let first = true;
 
     syncDispatch({ type: 'hydrateStarted', uid });
-    void (async () => {
-      try {
-        const [remote, remotePlaylists, remoteChords] = await Promise.all([
-          fetchRemoteSongs(uid),
-          fetchRemotePlaylists(uid),
-          fetchRemoteMyChords(uid),
-        ]);
-        if (cancelled) return;
 
-        const previous = lastSyncedUid();
-        const allowPush = previous === null || previous === uid;
-        if (!allowPush) {
-          // Someone else's library is on this device. It is about to be
-          // replaced by this account's, so set it aside rather than lose it.
-          const here = latest.current.store;
-          stashLibrary(previous, mergeOnSignIn(here.songs, remote, false).stranded);
-          stashLibrary(
-            previous,
-            mergeOnSignIn(here.playlists, remotePlaylists, false).stranded,
-            'playlists',
-          );
-          stashLibrary(
-            previous,
-            mergeOnSignIn(here.chords, remoteChords, false).stranded,
-            'chords',
-          );
-        }
-        const restored = takeStash(uid)
-          .map(parseSong)
-          .filter((song): song is Song => song !== null);
-        const restoredPlaylists = takeStash(uid, 'playlists')
-          .map(parsePlaylist)
-          .filter((p): p is Playlist => p !== null);
-        const restoredChords = takeStash(uid, 'chords')
-          .map(parseMyChord)
-          .filter((c): c is MyChord => c !== null);
-
-        rememberSyncedUid(uid);
-        dispatch({
-          type: 'HYDRATE',
-          remote,
-          allowPush,
-          restored,
-          remotePlaylists,
-          restoredPlaylists,
-          remoteChords,
-          restoredChords,
-        });
-        syncDispatch({ type: 'hydrateSucceeded', uid });
-      } catch (err) {
-        if (cancelled) return;
-        console.error('Could not load songs from the account', err);
-        syncDispatch({ type: 'hydrateFailed', uid, code: errorCode(err) });
+    const signIn = (remote: Song[], remotePlaylists: Playlist[], remoteChords: MyChord[]) => {
+      const previous = lastSyncedUid();
+      const allowPush = previous === null || previous === uid;
+      if (!allowPush) {
+        // Someone else's library is on this device. It is about to be
+        // replaced by this account's, so set it aside rather than lose it.
+        const here = latest.current.store;
+        stashLibrary(previous, mergeOnSignIn(here.songs, remote, false).stranded);
+        stashLibrary(
+          previous,
+          mergeOnSignIn(here.playlists, remotePlaylists, false).stranded,
+          'playlists',
+        );
+        stashLibrary(
+          previous,
+          mergeOnSignIn(here.chords, remoteChords, false).stranded,
+          'chords',
+        );
       }
-    })();
+      const restored = takeStash(uid)
+        .map(parseSong)
+        .filter((song): song is Song => song !== null);
+      const restoredPlaylists = takeStash(uid, 'playlists')
+        .map(parsePlaylist)
+        .filter((p): p is Playlist => p !== null);
+      const restoredChords = takeStash(uid, 'chords')
+        .map(parseMyChord)
+        .filter((c): c is MyChord => c !== null);
+
+      rememberSyncedUid(uid);
+      dispatch({
+        type: 'HYDRATE',
+        remote,
+        allowPush,
+        // Only a device this account has synced before can tell "deleted on
+        // another device" from "made here and never sent".
+        known: previous === uid,
+        restored,
+        remotePlaylists,
+        restoredPlaylists,
+        remoteChords,
+        restoredChords,
+      });
+      syncDispatch({ type: 'hydrateSucceeded', uid });
+    };
+
+    /* Each collection's answer lands here. Until all three have answered once
+       they are held; after that, each goes straight in on its own. */
+    const arrived = () => {
+      if (cancelled) return;
+      if (first) {
+        if (!songs || !playlists || !chords) return;
+        first = false;
+        signIn(songs, playlists, chords);
+        songs = playlists = chords = null;
+        return;
+      }
+      dispatch({
+        type: 'HYDRATE',
+        allowPush: true,
+        known: true,
+        ...(songs && { remote: songs }),
+        ...(playlists && { remotePlaylists: playlists }),
+        ...(chords && { remoteChords: chords }),
+      });
+      songs = playlists = chords = null;
+    };
+
+    const failed = (err: unknown) => {
+      if (cancelled) return;
+      listenFailed.current = true;
+      console.error('Could not load songs from the account', err);
+      syncDispatch({ type: 'hydrateFailed', uid, code: errorCode(err) });
+    };
+
+    const stops = [
+      watchRemoteSongs(uid, (list) => ((songs = list), arrived()), failed),
+      watchRemotePlaylists(uid, (list) => ((playlists = list), arrived()), failed),
+      watchRemoteMyChords(uid, (list) => ((chords = list), arrived()), failed),
+    ];
 
     return () => {
       cancelled = true;
+      for (const stop of stops) stop();
     };
-    // Once per sign-in, and again only when asked to (`attempt`) after a
-    // failure. `hydrated` is read, not watched: it turning true must not
-    // re-run this.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, attempt]);
+    // Once per sign-in, and again only after the listening failed and someone
+    // asked to try again, or the signal came back (`relisten`).
+  }, [account, relisten]);
 
   useEffect(() => {
     // Nothing goes up before the merge: an edit sent ahead of it would
@@ -929,6 +1080,7 @@ export function useSongs(uid: string | null) {
     failed.current.clear();
     if (account) syncDispatch({ type: 'retry', uid: account });
     setAttempt((n) => n + 1);
+    if (listenFailed.current) setRelisten((n) => n + 1);
   }, [account]);
 
   const current = useMemo(

@@ -24,7 +24,7 @@ type Loaded =
   | { status: 'failed' };
 
 /**
- * Where a link sent to the band lands, and what a row in Shared songs opens.
+ * Where a share link lands, and what a row in Shared songs opens.
  *
  * It asks nothing of whoever arrives: no account, no sign-in, the song straight
  * away. That is the whole reason a shared song is a document anyone holding its
@@ -32,7 +32,7 @@ type Loaded =
  * if they had typed it; signing in later backs it up like any other.
  *
  * It opens ready to play — the reading view, as any song of your own opens —
- * because a song sent to the band is usually sent to be played, tonight. It is
+ * because a song shared by link is usually shared to be played, tonight. It is
  * someone else's until it is added, so there is no Edit, and one thing to do.
  */
 export default function SharedSongScreen({ shareId, songs, onKeep, onOpenSong, onBack }: Props) {

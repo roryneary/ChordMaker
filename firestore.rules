@@ -60,17 +60,24 @@ service cloud.firestore {
         // How to play it (SongNote in src/types/song.ts), absent when there
         // are none. The 100 is MAX_NOTES in src/lib/notes.ts; a note's own
         // length is the app's to keep, since rules cannot look inside a list.
-        && (!('notes' in s) || (s.notes is list && s.notes.size() <= 100));
+        && (!('notes' in s) || (s.notes is list && s.notes.size() <= 100))
+        // Videos of it being played (SongVideo in src/types/song.ts), absent
+        // when there are none. The 20 is MAX_VIDEOS in src/lib/videos.ts.
+        && (!('videos' in s) || (s.videos is list && s.videos.size() <= 20));
     }
 
     function validSong(s, songId) {
       return s.keys().hasOnly(['id', 'title', 'artist', 'key', 'feel', 'capo', 'chords', 'lyric',
-                               'words', 'placements', 'notes', 'shared', 'copiedFrom',
+                               'words', 'placements', 'notes', 'videos', 'notNeeded',
+                               'shared', 'copiedFrom',
                                'createdAt', 'updatedAt'])
         && s.id == songId
         && validMusic(s)
         && (!('shared' in s) || s.shared is map)
         && (!('copiedFrom' in s) || s.copiedFrom is map)
+        // Details this song needs no prompt for (src/lib/details.ts). Kept on
+        // the owner's song only: it is not in the shared copy's list.
+        && (!('notNeeded' in s) || (s.notNeeded is list && s.notNeeded.size() <= 10))
         && s.createdAt is number && s.updatedAt is number;
     }
 
@@ -193,7 +200,7 @@ service cloud.firestore {
           && d.version is int
           && d.song is map
           && d.song.keys().hasOnly(['title', 'artist', 'key', 'feel', 'capo', 'chords', 'lyric',
-                                    'words', 'placements', 'notes'])
+                                    'words', 'placements', 'notes', 'videos'])
           && validMusic(d.song)
           && d.publishedAt is number && d.updatedAt is number;
       }

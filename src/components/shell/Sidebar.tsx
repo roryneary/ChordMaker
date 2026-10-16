@@ -15,7 +15,6 @@ import VersionLine from '../VersionLine';
 import { ChordCreatorLockup } from '../Brand';
 import type { Song } from '../../types/song';
 import { LIBRARY } from '../../data/chordLibrary';
-import { lineCount, unchordedLineCount } from '../../lib/lyric';
 
 interface Props {
   account: Account | null;
@@ -146,11 +145,6 @@ export default function Sidebar({
       <ul className="song-list">
         {shown.map((song) => {
           const open = song.id === currentId;
-          const toChord = unchordedLineCount(
-            song.words,
-            song.placements,
-            lineCount(song.lyric),
-          );
           return (
             <li key={song.id}>
               <button
@@ -164,7 +158,7 @@ export default function Sidebar({
                 </span>
                 {open && (
                   <span className="song-row-sub">
-                    open{toChord > 0 ? ` · ${toChord} lines to chord` : ''}
+                    open
                   </span>
                 )}
               </button>
@@ -188,16 +182,19 @@ export default function Sidebar({
       {/* Down with the account, not up with the songs: these are about you and
           the app, not about the music. */}
       <div className="nav-foot">
-        {/* Here as well as on the phone's account screen: signed in, the desktop
-            never opens that screen, and these are the player's, not the account's. */}
-        <button
-          type="button"
-          className={`nav-item${route.name === 'settings' ? ' is-active' : ''}`}
-          onClick={() => onGo({ name: 'settings' })}
-        >
-          <SlidersHorizontal size={18} />
-          <span>Settings</span>
-        </button>
+        {/* Signed in, Settings is behind your name on the chip below — it is
+            yours, and it will grow. Signed out there is no name to press, and
+            the prefs are still kept on the device, so it waits here instead. */}
+        {!account?.handle && (
+          <button
+            type="button"
+            className={`nav-item${route.name === 'settings' ? ' is-active' : ''}`}
+            onClick={() => onGo({ name: 'settings' })}
+          >
+            <SlidersHorizontal size={18} />
+            <span>Settings</span>
+          </button>
+        )}
         {/* The count is only what is waiting for you, and only when there is
             some: how many threads there are is nobody's business on every load. */}
         <button
@@ -219,12 +216,29 @@ export default function Sidebar({
           a rehearsal as often as it is not. Signed out, the same slot is the
           way in — an invitation, never a wall. */}
       {account?.handle ? (
-        <div className="user-chip">
-          <span className="avatar">{(account.display ?? account.handle).charAt(0).toUpperCase()}</span>
-          <span className="user-meta">
-            <strong>@{account.handle}</strong>
-            <SyncLine sync={sync} />
-          </span>
+        <div className={`user-chip${route.name === 'settings' ? ' is-active' : ''}`}>
+          {/* Your name opens your settings: pressing it used to do nothing.
+              "Try again" and "Out" sit beside it, not in it — a button cannot
+              hold another. */}
+          <button
+            type="button"
+            className="user-chip-open"
+            onClick={() => onGo({ name: 'settings' })}
+            title="Settings"
+          >
+            <span className="avatar">{(account.display ?? account.handle).charAt(0).toUpperCase()}</span>
+            <span className="user-meta">
+              <strong>@{account.handle}</strong>
+              <em className={sync.phase === 'error' ? 'is-error' : undefined} role="status">
+                {sync.label}
+              </em>
+            </span>
+          </button>
+          {sync.phase === 'error' && (
+            <button type="button" className="sync-retry" onClick={sync.retry}>
+              Try again
+            </button>
+          )}
           <button type="button" className="btn-ghost" onClick={() => void onSignOut()}>
             Out
           </button>

@@ -1,15 +1,9 @@
-import {
-  type DocumentData,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  setDoc,
-} from 'firebase/firestore';
+import { type DocumentData, collection, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import type { Song } from '../types/song';
 import { getFirebaseDb } from './firebase';
 import { withoutUndefined } from './firestoreData';
 import { parseSong } from './storage';
+import { watchCollection } from './watchCollection';
 
 /**
  * The remote half of a song's life, once an account exists. One document per
@@ -53,14 +47,11 @@ export async function deleteRemoteSong(uid: string, id: string): Promise<void> {
   await deleteDoc(doc(songsRef(uid), id));
 }
 
-export async function fetchRemoteSongs(uid: string): Promise<Song[]> {
-  const snap = await getDocs(songsRef(uid));
-  const songs: Song[] = [];
-  for (const d of snap.docs) {
-    // The doc id is the song id, but parseSong reads it from the stored
-    // fields — the two must agree, so pass the doc's own id in defensively.
-    const song = parseSong({ ...d.data(), id: d.id });
-    if (song) songs.push(song);
-  }
-  return songs;
+/** Every song the account holds, now and whenever that changes. See `watchCollection`. */
+export function watchRemoteSongs(
+  uid: string,
+  onList: (songs: Song[]) => void,
+  onError: (err: unknown) => void,
+): () => void {
+  return watchCollection(songsRef(uid), parseSong, onList, onError);
 }

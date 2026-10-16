@@ -19,6 +19,7 @@ export type SharePayload = Pick<
   | 'words'
   | 'placements'
   | 'notes'
+  | 'videos'
 >;
 
 /**

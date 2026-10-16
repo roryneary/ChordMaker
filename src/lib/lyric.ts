@@ -195,25 +195,3 @@ export function pruneToChords(placements: Placements, chordIds: string[]): Place
   }
   return out;
 }
-
-/**
- * How many lyric lines carry no chord yet — the "6 lines to chord" readout, and
- * what the landing screen's progress tag is derived from.
- */
-export function unchordedLineCount(
-  words: Word[],
-  placements: Placements,
-  lines: number,
-): number {
-  const chorded = new Set<number>();
-  for (const w of words) {
-    if (placements[w.id]) chorded.add(w.line);
-  }
-  let count = 0;
-  const grouped = groupByLine(words, lines);
-  grouped.forEach((lineWords, index) => {
-    // A blank line is a gap, not a line waiting for chords.
-    if (lineWords.length > 0 && !chorded.has(index)) count++;
-  });
-  return count;
-}

@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { ArrowsClockwise, Check, Copy, LinkBreak, ShareNetwork } from '@phosphor-icons/react';
 import { canShareLinks, copyText, shareLink } from '../lib/share';
-import { changedSinceShared, shareUrl } from '../lib/sharedSong';
+import { type SharingBlocked, changedSinceShared, shareUrl } from '../lib/sharedSong';
 import type { Song } from '../types/song';
 
-/** Why sharing is not on offer, when it is not. */
-export type SharingBlocked = 'signedOut' | 'noDatabase' | 'noCrypto' | null;
+export type { SharingBlocked };
 
 interface Props {
   song: Song;
@@ -16,7 +15,6 @@ interface Props {
   error: string | null;
   onShare: (listed: boolean) => void;
   onShareChanges: () => void;
-  onSetListed: (listed: boolean) => void;
   onStopSharing: () => void;
   onSignIn: () => void;
   onClose: () => void;
@@ -33,6 +31,10 @@ interface Props {
  * The words here never call a link private, because it is not: anyone it is
  * passed on to can open it. What is true is that nobody can *find* it, and that
  * stopping kills it — so that is what the sheet says.
+ *
+ * "Make available globally" is not in here. It was, twice, as well as in the
+ * sheet this one opens from; it lives in that sheet now (`GlobalToggle`), one
+ * tap back, so there is one box for it on the way to sharing and not three.
  */
 export default function ShareLinkSheet({
   song,
@@ -41,12 +43,10 @@ export default function ShareLinkSheet({
   error,
   onShare,
   onShareChanges,
-  onSetListed,
   onStopSharing,
   onSignIn,
   onClose,
 }: Props) {
-  const [listed, setListed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [canSend] = useState(canShareLinks);
@@ -55,21 +55,6 @@ export default function ShareLinkSheet({
   const shared = song.shared;
   const url = shared ? shareUrl(shared.shareId, window.location.href) : '';
   const changed = changedSinceShared(song);
-
-  const listedToggle = (checked: boolean, onChange: (next: boolean) => void) => (
-    <label className="share-listed">
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={busy}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span>
-        <strong>Make available globally</strong>
-        <em>Anyone signed in can find it in Shared songs. Off, only people you give the link to.</em>
-      </span>
-    </label>
-  );
 
   const body = () => {
     if (blocked === 'noDatabase') {
@@ -102,13 +87,12 @@ export default function ShareLinkSheet({
             their own, without an account. Your song stays yours: nothing they do changes it, and
             they only get later changes when you choose to share them.
           </p>
-          {listedToggle(listed, setListed)}
           <div className="check-actions">
             <button
               type="button"
               className="btn-primary btn-block"
               disabled={busy}
-              onClick={() => onShare(listed)}
+              onClick={() => onShare(false)}
             >
               {busy ? 'Making the link…' : 'Make the link'}
             </button>
@@ -166,15 +150,13 @@ export default function ShareLinkSheet({
           </span>
         </button>
 
-        {listedToggle(shared.listed, onSetListed)}
-
         {stopping ? (
           <div className="check-row share-stop">
             <LinkBreak size={20} />
             <span>
               <strong>Stop sharing “{title}”?</strong>
-              <em>The link stops working for everyone. Copies people have already kept are theirs,
-                and stay.</em>
+              <em>The link stops working for everyone{shared.listed ? ', and it leaves Shared songs' : ''}.
+                Copies people have already kept are theirs, and stay.</em>
             </span>
             <button type="button" className="btn-ghost" disabled={busy} onClick={onStopSharing}>
               {busy ? 'Stopping…' : 'Stop'}
@@ -194,7 +176,7 @@ export default function ShareLinkSheet({
       <button type="button" className="scrim" aria-label="Close" onClick={onClose} />
       <div className="sheet" role="dialog" aria-label={`Share ${title}`}>
         <i className="grab" />
-        <h2>{shared ? 'Shared' : 'Send a link to the band'}</h2>
+        <h2>Share using link</h2>
         {body()}
         {error && (
           <p className="field-note is-error" role="alert">
